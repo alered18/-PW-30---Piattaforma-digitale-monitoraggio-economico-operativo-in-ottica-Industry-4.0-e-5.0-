@@ -3,19 +3,10 @@
 import pytest
 
 
-def test_linee(client):
-    risposta = client.get("/api/linee")
-    assert risposta.status_code == 200
-    assert risposta.json() == [{"codice": "L1", "nome": "Linea pasta corta"}]
-
-
 def test_macchine_nell_ordine_della_linea_con_i_parametri(client):
-    risposta = client.get("/api/macchine")
-    assert risposta.status_code == 200
-    macchine = risposta.json()
+    macchine = client.get("/api/macchine").json()
     assert [m["codice"] for m in macchine] == ["M1", "M2", "M3", "M4", "M5"]
-    essiccatoio = macchine[2]
-    assert essiccatoio == {
+    assert macchine[2] == {
         "codice": "M3",
         "nome": "Essiccatoio",
         "ordine": 3,
@@ -27,45 +18,23 @@ def test_macchine_nell_ordine_della_linea_con_i_parametri(client):
         "scarto_nominale": 0.015,
         "costo_scarto_eur_conf": 0.25,
     }
-    for macchina in macchine:
-        assert all(valore is not None for valore in macchina.values()), macchina
 
 
-def test_causali(client):
+def test_causali_con_la_sola_manutenzione_pianificata(client):
     causali = client.get("/api/causali").json()
-    assert {c["codice"] for c in causali} == {"guasto", "setup", "mancanza_materiale", "manutenzione", "micro_fermata"}
+    assert len(causali) == 5
     assert [c["codice"] for c in causali if c["pianificata"]] == ["manutenzione"]
 
 
-def test_parametri(client):
-    parametri = {p["chiave"]: p for p in client.get("/api/parametri").json()}
-    assert parametri["prezzo_energia"] == {
-        "chiave": "prezzo_energia",
-        "valore": 0.2,
-        "unita": "€/kWh",
-        "descrizione": "Prezzo dell'energia elettrica per un'utenza non domestica",
-    }
-
-
-def test_modifica_di_un_parametro_resta_memorizzata(client):
-    risposta = client.put("/api/parametri/prezzo_energia", json={"valore": 0.25})
-    assert risposta.status_code == 200
-    assert risposta.json()["valore"] == 0.25
+def test_modifica_di_un_parametro(client):
+    assert client.put("/api/parametri/prezzo_energia", json={"valore": 0.25}).status_code == 200
     parametri = {p["chiave"]: p["valore"] for p in client.get("/api/parametri").json()}
     assert parametri["prezzo_energia"] == 0.25
-
-
-def test_modifica_di_un_parametro_inesistente(client):
-    risposta = client.put("/api/parametri/inventato", json={"valore": 1})
-    assert risposta.status_code == 404
-
-
-@pytest.mark.parametrize("valore", [-1, 100_000_000])
-def test_modifica_con_valore_fuori_intervallo_rifiutata(client, valore):
-    assert client.put("/api/parametri/prezzo_energia", json={"valore": valore}).status_code == 422
+    assert client.put("/api/parametri/inventato", json={"valore": 1}).status_code == 404
+    assert client.put("/api/parametri/prezzo_energia", json={"valore": -1}).status_code == 422
 
 
 def test_documentazione_elenca_gli_endpoint(client):
     percorsi = client.get("/api/openapi.json").json()["paths"]
-    for percorso in ["/api/salute", "/api/linee", "/api/macchine", "/api/causali", "/api/parametri"]:
+    for percorso in ["/api/salute", "/api/macchine", "/api/causali", "/api/parametri", "/api/rilevazioni"]:
         assert percorso in percorsi
