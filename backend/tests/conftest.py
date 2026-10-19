@@ -10,6 +10,12 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db.sessione import sessione
+from app.main import app
 
 RADICE = Path(__file__).resolve().parents[2]
 SCRIPT_SCHEMA = [RADICE / "database" / "init" / "01_schema.sql", RADICE / "database" / "init" / "02_dati_iniziali.sql"]
@@ -43,3 +49,20 @@ def db():
         for script in SCRIPT_SCHEMA:
             conn.execute(script.read_text(encoding="utf-8"))
         yield conn
+
+
+@pytest.fixture
+def client(db):
+    """Client HTTP dell'applicazione collegato al database di test (schema ricreato dal fixture db)."""
+    motore = create_engine(_url_database_test().replace("postgresql://", "postgresql+psycopg://"))
+    fabbrica = sessionmaker(bind=motore)
+
+    def sessione_di_test():
+        with fabbrica() as s:
+            yield s
+
+    app.dependency_overrides[sessione] = sessione_di_test
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+    motore.dispose()

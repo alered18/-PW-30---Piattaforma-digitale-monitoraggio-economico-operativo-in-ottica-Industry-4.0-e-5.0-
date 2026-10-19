@@ -1,10 +1,8 @@
-"""Punto di ingresso del back-end.
-
-Per ora espone solo il controllo di vita usato da Docker Compose; i router delle altre aree
-(anagrafica, rilevazioni, KPI, soglie, operatore) saranno registrati qui.
-"""
+"""Punto di ingresso del back-end: crea l'applicazione FastAPI e registra i router sotto il prefisso /api."""
 
 from fastapi import FastAPI
+
+from app.api import anagrafica, sistema
 
 app = FastAPI(
     title="PW 30 — Monitoraggio produzione",
@@ -14,7 +12,5 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-
-@app.get("/api/salute", tags=["sistema"], summary="Controllo di vita del back-end")
-def salute() -> dict[str, str]:
-    return {"stato": "ok"}
+app.include_router(sistema.router, prefix="/api")
+app.include_router(anagrafica.router, prefix="/api")
