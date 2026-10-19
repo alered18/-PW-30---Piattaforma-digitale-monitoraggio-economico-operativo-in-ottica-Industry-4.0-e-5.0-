@@ -1,0 +1,53 @@
+# Avvio dei quattro componenti (database, back-end, generatore, front-end): docker compose up --build
+# Dashboard: http://localhost:8080  ·  Documentazione API: http://localhost:8010/api/docs
+# Le porte esposte sul PC si cambiano in .env (PORTA_*); dentro la rete di Compose restano quelle standard.
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - dati-db:/var/lib/postgresql
+    ports:
+      - "${PORTA_DB:-5432}:5432"   # esposta per i test d'integrazione e per ispezionare il database dal PC
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    ports:
+      - "${PORTA_BACKEND:-8010}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/salute')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  generator:
+    build: ./generator
+    env_file: .env
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${PORTA_FRONTEND:-8080}:80"
+    depends_on:
+      - backend
+
+volumes:
+  dati-db:

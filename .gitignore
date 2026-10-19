@@ -1,0 +1,19 @@
+# Configurazione locale con le credenziali (versionato solo .env.example)
+.env
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# Editor e sistema
+.idea/
+Thumbs.db
+.DS_Store
