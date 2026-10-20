@@ -36,7 +36,7 @@ from app.servizi.calendario import FUSO, chiusura, giorno_di, secondi_disponibil
 SCOPERTO_MINIMO_S = 60
 
 
-def _parametri(db: Session) -> ParametriEconomici:
+def parametri_economici(db: Session) -> ParametriEconomici:
     valori = {chiave: float(valore) for chiave, valore in db.execute(select(Parametro.chiave, Parametro.valore))}
     return ParametriEconomici(
         prezzo_energia=valori["prezzo_energia"],
@@ -47,7 +47,7 @@ def _parametri(db: Session) -> ParametriEconomici:
     )
 
 
-def _dati_macchina(m: Macchina) -> DatiMacchina:
+def dati_macchina(m: Macchina) -> DatiMacchina:
     return DatiMacchina(m.codice, m.ordine, float(m.capacita_conf_h), float(m.costo_orario_eur),
                         float(m.costo_scarto_eur_conf))
 
@@ -80,15 +80,18 @@ def _somme_del_giorno(db: Session, giorno: date) -> dict[int, dict]:
 def ricalcola_giorno(db: Session, giorno: date, adesso: datetime | None = None) -> bool:
     """Ricalcola un giorno. Restituisce False se quel giorno non ha rilevazioni (nulla da calcolare)."""
     adesso = adesso or datetime.now(FUSO)
+    # Un ricalcolo alla volta per lo stesso giorno (generatore, lettura dei KPI, import): il lock del database
+    # dura fino alla fine della transazione e fa attendere le altre richieste invece di farle collidere.
+    db.execute(select(func.pg_advisory_xact_lock(giorno.toordinal())))
     somme = _somme_del_giorno(db, giorno)
     if not somme:
         return False
 
     macchine = list(db.scalars(select(Macchina).order_by(Macchina.ordine)))
-    dati_macchine = [_dati_macchina(m) for m in macchine]
+    dati_macchine = [dati_macchina(m) for m in macchine]
     capacita = capacita_linea(dati_macchine)
     linea = db.scalars(select(Linea)).one()
-    parametri = _parametri(db)
+    parametri = parametri_economici(db)
     # Giorno in corso: il tempo disponibile arriva solo fin dove arrivano i dati e i KPI sono parziali.
     parziale = giorno == giorno_di(adesso) and adesso < chiusura(giorno)
     ultima = max(s["fine"] for s in somme.values())

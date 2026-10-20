@@ -122,6 +122,11 @@ def capacita_linea(macchine: Iterable[DatiMacchina]) -> float:
     return min(m.capacita_conf_h for m in macchine)
 
 
+def produzione_kg(n_buoni: int, peso_conf_kg: float) -> float:
+    """Produzione buona espressa in kg (le quantità si contano in confezioni)."""
+    return n_buoni * peso_conf_kg
+
+
 def valore_produzione_persa_h(capacita_linea_conf_h: float, parametri: ParametriEconomici) -> float:
     """Margine perso in un'ora di linea ferma: ciò che la linea avrebbe prodotto × margine per confezione."""
     return capacita_linea_conf_h * parametri.margine_conf
