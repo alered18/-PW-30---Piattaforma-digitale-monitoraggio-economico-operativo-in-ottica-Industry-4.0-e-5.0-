@@ -25,10 +25,12 @@ def test_kpi_linea_non_media_delle_macchine():
     assert k.oee != pytest.approx(media, abs=1e-3)
 
 
-def test_fermo_di_un_ora_sulla_trafila():
-    # 60 minuti di fermo su M2: 1 h × (40 €/h costo della trafila + 2.000 conf/h × 0,40 €) = 840 €.
+def test_costo_di_un_fermo_di_un_ora():
     base = GrandezzeBase(GIORNATA, 0, ORA, GIORNATA - ORA, 25000, 0, 1000.0)
-    assert kpi_di("M2", base).costo_fermi_eur == pytest.approx(840.0)
+    # Trafila: i buffer assorbono il fermo, si paga solo il suo costo orario (40 €).
+    assert kpi_di("M2", base).costo_fermi_eur == pytest.approx(40.0)
+    # Essiccatoio, collo di bottiglia: 45 €/h + 2.000 conf/h × 0,40 € di produzione persa = 845 €.
+    assert kpi_di("M3", base).costo_fermi_eur == pytest.approx(845.0)
 
 
 def test_manutenzione_programmata_non_penalizza_oee():

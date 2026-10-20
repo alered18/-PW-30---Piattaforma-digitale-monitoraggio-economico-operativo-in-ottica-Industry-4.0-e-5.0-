@@ -49,5 +49,5 @@ INSERT INTO soglia (kpi, ambito, verso, valore) VALUES
     ('tasso_scarto',    'linea',    'max', 0.05),
     ('tasso_scarto',    'macchina', 'max', 0.03),
     ('kwh_conf',        'linea',    'max', 0.25),
-    ('costo_fermi_eur', 'linea',    'max', 1500),
+    ('costo_fermi_eur', 'linea',    'max', 2500),
     ('saturazione',     'macchina', 'min', 0.70);

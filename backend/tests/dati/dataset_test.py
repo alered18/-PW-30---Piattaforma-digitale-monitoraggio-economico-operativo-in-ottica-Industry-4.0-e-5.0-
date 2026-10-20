@@ -106,9 +106,9 @@ ATTESI_LINEA = {
     "tasso_scarto": 1100 / 25600,  # 4,297%
     "kwh": 4707.25,
     "kwh_conf": 4707.25 / 24500,  # 0,1921 kWh per confezione
-    # Fermi: ore × (costo orario + 800 €/h)
-    #   M1 1 × 825 + M2 1,5 × 840 + M3 2 × 845 + M4 1 × 835 + M5 0,5 × 820 = 825 + 1.260 + 1.690 + 835 + 410
-    "costo_fermi_eur": 5020.0,
+    # Fermi: ore × costo orario; per l'essiccatoio (collo di bottiglia) si aggiungono 800 €/h di produzione persa.
+    #   M1 1 × 25 + M2 1,5 × 40 + M3 2 × (45 + 800) + M4 1 × 35 + M5 0,5 × 20 = 25 + 60 + 1.690 + 35 + 10
+    "costo_fermi_eur": 1820.0,
     "co2_kg": 4707.25 * 0.27,  # 1.270,96 kg
     "co2_kg_conf": 4707.25 * 0.27 / 24500,  # 0,0519 kg per confezione
     "saturazione": 74 / 80,  # nessuna manutenzione: tempo disponibile = tempo pianificato
