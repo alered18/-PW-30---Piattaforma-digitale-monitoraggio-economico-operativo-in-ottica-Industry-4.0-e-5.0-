@@ -4,12 +4,12 @@ I controlli sono gli stessi per i blocchi inviati dal generatore e per le righe 
 non valida riceve l'elenco completo dei motivi, in italiano, così chi invia i dati capisce cosa correggere.
 """
 
+from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.db.tabelle import CausaleFermo, Macchina, Rilevazione
@@ -75,23 +75,27 @@ def controlla(db: Session, rilevazioni: list[RilevazioneIn]) -> Controllo:
         else:
             candidate.append((indice, r))
 
-    esistenti = _intervalli_esistenti(db, candidate, macchine)
+    # Per ogni macchina gli intervalli occupati, ordinati per inizio: con la ricerca binaria basta confrontare una
+    # rilevazione con l'intervallo che la precede e con quello che la segue (un blocco di storico ne ha migliaia).
+    occupati = {codice: sorted(intervalli) for codice, intervalli in _intervalli_esistenti(db, candidate, macchine).items()}
     valide: list[tuple[int, RilevazioneIn]] = []
     duplicate = 0
-    visti: dict[str, list[tuple[datetime, datetime]]] = defaultdict(list)
     for indice, r in sorted(candidate, key=lambda c: (c[1].macchina, c[1].inizio)):
         fine = r.inizio + timedelta(seconds=r.durata_s)
-        gia_presenti = esistenti[r.macchina] + visti[r.macchina]
-        if any(inizio == r.inizio for inizio, _ in gia_presenti):
+        intervalli = occupati.setdefault(r.macchina, [])
+        posizione = bisect_left(intervalli, (r.inizio,))
+        if posizione < len(intervalli) and intervalli[posizione][0] == r.inizio:
             duplicate += 1
             continue
-        if any(inizio < fine and r.inizio < fine_esistente for inizio, fine_esistente in gia_presenti):
+        precedente_sovrapposto = posizione > 0 and intervalli[posizione - 1][1] > r.inizio
+        successivo_sovrapposto = posizione < len(intervalli) and intervalli[posizione][0] < fine
+        if precedente_sovrapposto or successivo_sovrapposto:
             scartate.append(RigaScartata(
                 indice=indice, macchina=r.macchina, inizio=r.inizio,
                 motivi=["l'intervallo si sovrappone a un'altra rilevazione della stessa macchina"],
             ))
             continue
-        visti[r.macchina].append((r.inizio, fine))
+        intervalli.insert(posizione, (r.inizio, fine))
         valide.append((indice, r))
 
     scartate.sort(key=lambda s: s.indice)
@@ -145,9 +149,17 @@ def memorizza(db: Session, valide: list[tuple[int, RilevazioneIn]], fonte: str =
         }
         for _, r in valide
     ]
-    # Se un'altra richiesta ha appena inserito la stessa rilevazione, il vincolo unico la fa ignorare.
-    istruzione = insert(Rilevazione).on_conflict_do_nothing(constraint="rilevazione_unica").returning(Rilevazione.id)
-    memorizzate = len(db.execute(istruzione, righe).all())
+    # Inserimento con executemany del driver psycopg, che invia tutte le righe in sequenza senza attendere la
+    # risposta a ognuna (pipeline): un giorno di storico (4.800 righe) richiede una frazione di secondo.
+    # Se un'altra richiesta ha appena inserito la stessa rilevazione, il vincolo unico la fa ignorare e non è contata.
+    colonne = list(righe[0])
+    istruzione = (
+        f"INSERT INTO rilevazione ({', '.join(colonne)}) VALUES ({', '.join(['%s'] * len(colonne))}) "
+        "ON CONFLICT ON CONSTRAINT rilevazione_unica DO NOTHING"
+    )
+    with db.connection().connection.cursor() as cursore:
+        cursore.executemany(istruzione, [tuple(r[c] for c in colonne) for r in righe])
+        memorizzate = cursore.rowcount
     db.commit()
     giorni = sorted({giorno_di(r.inizio) for _, r in valide})
     return memorizzate, giorni
