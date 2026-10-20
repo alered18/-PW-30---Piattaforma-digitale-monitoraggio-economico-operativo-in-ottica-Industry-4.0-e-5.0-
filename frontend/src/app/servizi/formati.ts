@@ -26,7 +26,8 @@ export function formatta(valore: number | null | undefined, formato: Formato): s
 
 /** Data in formato ISO (aaaa-mm-gg) nel fuso del browser, come la vuole l'API. */
 export function dataIso(data: Date): string {
-  return formatDate(data, 'yyyy-MM-dd', LOCALE);
+  const due = (n: number) => String(n).padStart(2, '0');
+  return `${data.getFullYear()}-${due(data.getMonth() + 1)}-${due(data.getDate())}`;
 }
 
 export function dataBreve(iso: string): string {

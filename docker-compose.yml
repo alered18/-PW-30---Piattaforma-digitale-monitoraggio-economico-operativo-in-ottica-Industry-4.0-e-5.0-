@@ -38,6 +38,11 @@ services:
 
   generator:
     build: ./generator
+    # In modalità auto resta attivo con il live. Riparte solo se esce per un errore (ad esempio back-end non
+    # raggiungibile), non quando ha finito il suo lavoro (modalità storico o data di fine fissata).
+    restart: on-failure
+    # Processo di init: inoltra il segnale di arresto al generatore, così "docker compose stop" è immediato.
+    init: true
     # Solo le impostazioni del generatore: nessuna credenziale del database, parla solo con le API.
     environment:
       GEN_API_URL: ${GEN_API_URL}

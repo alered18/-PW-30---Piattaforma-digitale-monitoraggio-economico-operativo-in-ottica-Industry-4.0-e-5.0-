@@ -1,9 +1,11 @@
 """Test della simulazione, senza back-end."""
 
-from datetime import date, datetime
+from dataclasses import asdict
+from datetime import date, datetime, timedelta
 
 from client_api import ClientApi
-from main import ripresa
+from config import Impostazioni
+from main import live, ripresa
 from simulatore.calendario import FUSO
 from simulatore.flusso import simula_storico
 from simulatore.macchina import DatiMacchina
@@ -68,3 +70,34 @@ def test_modalita_auto_riprende_dopo_l_ultima_rilevazione():
 def test_backend_spento_segnalato():
     # Nessun servizio in ascolto su questa porta: il generatore rinuncia invece di scrivere dati.
     assert ClientApi("http://127.0.0.1:9/api").attendi(tentativi=1, attesa_s=0) is False
+
+
+class ClientFinto:
+    """Al posto del back-end: restituisce l'anagrafica e conserva i blocchi ricevuti."""
+
+    def __init__(self):
+        self.blocchi = []
+
+    def macchine(self):
+        return [asdict(m) for m in MACCHINE]
+
+    def invia(self, blocco):
+        self.blocchi.append(blocco)
+        return {"memorizzate": len(blocco), "duplicate": 0}
+
+
+def esegui_live(da: datetime, minuti: int) -> list[list[dict]]:
+    # Orologio simulato: "dormire" sposta solo l'ora corrente, così il test dura un istante.
+    orologio = [da]
+    client = ClientFinto()
+    live(client, Impostazioni(intervallo_live_s=5), fino_a=da + timedelta(minutes=minuti),
+         adesso=lambda: orologio[0], dormi=lambda s: orologio.__setitem__(0, orologio[0] + timedelta(seconds=s)))
+    return client.blocchi
+
+
+def test_live_un_blocco_ogni_5_secondi_solo_in_orario_di_turno():
+    blocchi = esegui_live(datetime(2026, 10, 16, 10, 0, 2, tzinfo=FUSO), 1)  # parte dal passo allineato 10:00:00
+    assert len(blocchi) == 12 and all(len(b) == 5 for b in blocchi)
+    assert blocchi[0][0]["inizio"] == "2026-10-16T10:00:00+02:00" and blocchi[0][0]["durata_s"] == 5
+    # A cavallo della chiusura delle 22:00 si inviano solo i passi che finiscono entro l'orario di turno.
+    assert len(esegui_live(datetime(2026, 10, 16, 21, 59, 30, tzinfo=FUSO), 1)) == 6

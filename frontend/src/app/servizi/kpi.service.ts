@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { Injectable, signal } from '@angular/core';
+import { effect, Injectable, signal } from '@angular/core';
 import { Granularita, Macchina, RispostaKpi } from '../modelli/kpi';
 import { dataIso } from './formati';
 
@@ -11,6 +11,9 @@ export interface FiltriKpi {
   ambito: string;
 }
 
+/** Ogni quanto si rileggono i KPI quando il periodo comprende oggi. */
+export const AGGIORNAMENTO_MS = 10_000;
+
 function ultimiGiorni(n: number, oggi = new Date()): Pick<FiltriKpi, 'da' | 'a'> {
   const da = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate() - (n - 1));
   return { da, a: new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate()) };
@@ -18,7 +21,8 @@ function ultimiGiorni(n: number, oggi = new Date()): Pick<FiltriKpi, 'da' | 'a'>
 
 /**
  * Stato dei KPI condiviso dalle pagine: i filtri sono un signal e la risposta dell'API si ricarica da sola a ogni
- * loro modifica (httpResource annulla la richiesta precedente se non è ancora arrivata).
+ * loro modifica (httpResource annulla la richiesta precedente se non è ancora arrivata). Se il periodo comprende
+ * oggi i dati cambiano mentre il generatore lavora, quindi si rileggono anche ogni 10 secondi.
  */
 @Injectable({ providedIn: 'root' })
 export class KpiService {
@@ -33,6 +37,31 @@ export class KpiService {
   });
 
   readonly macchine = httpResource<Macchina[]>(() => '/api/macchine', { defaultValue: [] });
+
+  /** Ora in cui sono arrivati gli ultimi KPI. */
+  readonly aggiornatoAlle = signal<Date | null>(null);
+
+  /** Vero se il periodo selezionato comprende la data odierna. */
+  comprendeOggi(): boolean {
+    const { da, a } = this.filtri();
+    const oggi = dataIso(new Date());
+    return dataIso(da) <= oggi && oggi <= dataIso(a);
+  }
+
+  constructor() {
+    effect((alTermine) => {
+      if (!this.comprendeOggi()) return;
+      const timer = setInterval(() => this.kpi.reload(), AGGIORNAMENTO_MS);
+      alTermine(() => clearInterval(timer));
+    });
+    // Ogni risposta arrivata, anche se uguale alla precedente, è un nuovo oggetto: l'effetto riparte e segna l'ora.
+    effect(() => {
+      if (this.kpi.hasValue()) {
+        this.kpi.value();
+        this.aggiornatoAlle.set(new Date());
+      }
+    });
+  }
 
   aggiorna(modifiche: Partial<FiltriKpi>): void {
     this.filtri.update((f) => ({ ...f, ...modifiche }));

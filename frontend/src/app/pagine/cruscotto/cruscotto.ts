@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, linkedSignal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -69,6 +70,7 @@ const GRUPPI: { titolo: string; indicatori: Indicatore[] }[] = [
 @Component({
   selector: 'app-cruscotto',
   imports: [
+    DatePipe,
     ReactiveFormsModule,
     MatButtonToggleModule,
     MatCardModule,

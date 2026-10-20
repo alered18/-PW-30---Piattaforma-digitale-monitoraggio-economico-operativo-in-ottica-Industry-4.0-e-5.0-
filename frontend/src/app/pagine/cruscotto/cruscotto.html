@@ -30,7 +30,8 @@
   </mat-button-toggle-group>
 </section>
 
-@if (servizio.kpi.isLoading()) {
+<!-- Solo al cambio dei filtri: i rinnovi automatici ogni 10 s avvengono senza segnali visivi. -->
+@if (servizio.kpi.status() === 'loading') {
   <mat-progress-bar mode="indeterminate" />
 }
 
@@ -47,6 +48,9 @@
       <span class="parziale">dati parziali</span>
     }
   </p>
+  @if (servizio.comprendeOggi() && servizio.aggiornatoAlle(); as ora) {
+    <p class="aggiornamento">Aggiornamento automatico ogni 10 secondi · ultimo alle {{ ora | date: 'HH:mm:ss' }}</p>
+  }
 
   @for (gruppo of gruppi; track gruppo.titolo) {
     <h2>{{ gruppo.titolo }}</h2>
