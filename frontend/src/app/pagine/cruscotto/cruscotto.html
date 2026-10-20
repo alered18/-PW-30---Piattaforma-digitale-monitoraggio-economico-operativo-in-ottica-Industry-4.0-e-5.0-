@@ -1,0 +1,107 @@
+<section class="filtri">
+  <mat-form-field appearance="outline">
+    <mat-label>Periodo</mat-label>
+    <mat-date-range-input [formGroup]="intervallo" [rangePicker]="calendario" [max]="oggi">
+      <input matStartDate formControlName="da" placeholder="Dal" />
+      <input matEndDate formControlName="a" placeholder="Al" />
+    </mat-date-range-input>
+    <mat-datepicker-toggle matIconSuffix [for]="calendario" />
+    <mat-date-range-picker #calendario />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Ambito</mat-label>
+    <mat-select [value]="servizio.filtri().ambito" (valueChange)="cambiaAmbito($event)">
+      <mat-option value="linea">Linea</mat-option>
+      @for (m of macchine(); track m.codice) {
+        <mat-option [value]="m.codice">{{ m.codice }} {{ m.nome }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-button-toggle-group
+    aria-label="Granularità"
+    [value]="servizio.filtri().granularita"
+    (change)="cambiaGranularita($event.value)"
+  >
+    <mat-button-toggle value="giorno">Giorno</mat-button-toggle>
+    <mat-button-toggle value="settimana">Settimana</mat-button-toggle>
+    <mat-button-toggle value="mese">Mese</mat-button-toggle>
+  </mat-button-toggle-group>
+</section>
+
+@if (servizio.kpi.isLoading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (servizio.kpi.error()) {
+  <p class="messaggio errore">Impossibile caricare gli indicatori: il back-end non risponde o ha rifiutato i filtri.</p>
+} @else if (risposta() && !totale()) {
+  <p class="messaggio">Nessun dato nel periodo selezionato.</p>
+}
+
+@if (totale(); as t) {
+  <p class="riferimento">
+    {{ riferimento() }}
+    @if (t.parziale) {
+      <span class="parziale">dati parziali</span>
+    }
+  </p>
+
+  @for (gruppo of gruppi; track gruppo.titolo) {
+    <h2>{{ gruppo.titolo }}</h2>
+    <div class="card">
+      @for (i of gruppo.indicatori; track i.chiave) {
+        <mat-card appearance="outlined" class="indicatore">
+          <mat-card-content>
+            <div class="nome">{{ i.nome }}</div>
+            <div class="valore">
+              {{ formatta($any(t.kpi[i.chiave]), i.formato) }}
+              @if (i.unita) {
+                <span class="unita">{{ i.unita }}</span>
+              }
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  }
+  @if (t.kpi.prestazioni_limitate) {
+    <p class="messaggio">Le prestazioni calcolate superavano il 100% e sono state limitate: dato da verificare.</p>
+  }
+
+  <h2>Andamento per periodo</h2>
+  <table mat-table [dataSource]="serie()" class="serie">
+    <ng-container matColumnDef="periodo">
+      <th mat-header-cell *matHeaderCellDef>Periodo</th>
+      <td mat-cell *matCellDef="let p">
+        {{ etichetta(p) }}
+        @if (p.parziale) {
+          <span class="parziale">parziale</span>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="n_buoni">
+      <th mat-header-cell *matHeaderCellDef>Confezioni buone</th>
+      <td mat-cell *matCellDef="let p">{{ formatta(p.kpi.n_buoni, 'intero') }}</td>
+    </ng-container>
+    <ng-container matColumnDef="oee">
+      <th mat-header-cell *matHeaderCellDef>OEE</th>
+      <td mat-cell *matCellDef="let p">{{ formatta(p.kpi.oee, 'percentuale') }}</td>
+    </ng-container>
+    <ng-container matColumnDef="tasso_scarto">
+      <th mat-header-cell *matHeaderCellDef>Scarti</th>
+      <td mat-cell *matCellDef="let p">{{ formatta(p.kpi.tasso_scarto, 'percentuale') }}</td>
+    </ng-container>
+    <ng-container matColumnDef="kwh_conf">
+      <th mat-header-cell *matHeaderCellDef>kWh/conf</th>
+      <td mat-cell *matCellDef="let p">{{ formatta(p.kpi.kwh_conf, 'decimale') }}</td>
+    </ng-container>
+    <ng-container matColumnDef="costo_fermi_eur">
+      <th mat-header-cell *matHeaderCellDef>Costo dei fermi</th>
+      <td mat-cell *matCellDef="let p">{{ formatta(p.kpi.costo_fermi_eur, 'euro') }}</td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="colonne"></tr>
+    <tr mat-row *matRowDef="let riga; columns: colonne"></tr>
+  </table>
+}

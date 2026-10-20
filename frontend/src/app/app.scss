@@ -1,3 +1,17 @@
+mat-toolbar {
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  gap: 24px;
+
+  a {
+    color: inherit;
+  }
+
+  .attivo {
+    background: color-mix(in srgb, var(--mat-sys-on-primary) 15%, transparent);
+  }
+}
+
 .contenuto {
-  padding: 16px;
+  padding: 16px 24px 32px;
 }

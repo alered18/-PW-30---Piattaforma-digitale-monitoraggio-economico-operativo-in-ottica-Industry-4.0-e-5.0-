@@ -1,8 +1,10 @@
-<mat-toolbar color="primary">
-  <span>{{ titolo }}</span>
+<mat-toolbar>
+  <span class="titolo">{{ titolo }}</span>
+  <nav>
+    <a mat-button routerLink="/cruscotto" routerLinkActive="attivo">Cruscotto</a>
+  </nav>
 </mat-toolbar>
 
 <main class="contenuto">
-  <p>Piattaforma di monitoraggio in costruzione.</p>
   <router-outlet />
 </main>

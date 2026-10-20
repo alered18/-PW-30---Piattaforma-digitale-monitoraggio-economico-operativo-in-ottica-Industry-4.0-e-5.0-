@@ -1,0 +1,66 @@
+.filtri {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+
+  mat-button-toggle-group {
+    margin-bottom: 22px; // allineato ai campi, che riservano spazio sotto per i messaggi
+  }
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+  margin: 24px 0 8px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.indicatore {
+  .nome {
+    font: var(--mat-sys-label-large);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .valore {
+    font: var(--mat-sys-headline-small);
+    margin-top: 4px;
+  }
+
+  .unita {
+    font: var(--mat-sys-body-medium);
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.riferimento {
+  font: var(--mat-sys-body-large);
+  margin: 8px 0 0;
+}
+
+.parziale {
+  font: var(--mat-sys-label-small);
+  background: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  border-radius: 8px;
+  padding: 2px 8px;
+  margin-left: 8px;
+}
+
+.messaggio {
+  margin: 16px 0;
+  color: var(--mat-sys-on-surface-variant);
+
+  &.errore {
+    color: var(--mat-sys-error);
+  }
+}
+
+.serie {
+  width: auto;
+  min-width: 720px;
+}
