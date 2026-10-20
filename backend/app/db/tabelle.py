@@ -131,6 +131,7 @@ class Indicatore(Base):
     costo_materia_eur: Mapped[Decimal]
     costo_totale_eur: Mapped[Decimal]
     costo_unitario_eur: Mapped[Decimal | None]
+    costo_scarti_eur: Mapped[Decimal]
     parziale: Mapped[bool] = mapped_column(default=False)
     calcolato_il: Mapped[datetime] = mapped_column(server_default=func.now())
 

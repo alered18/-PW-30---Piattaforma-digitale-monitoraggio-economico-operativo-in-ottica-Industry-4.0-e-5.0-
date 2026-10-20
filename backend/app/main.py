@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.api import anagrafica, rilevazioni, sistema
+from app.api import anagrafica, kpi, rilevazioni, sistema
 
 app = FastAPI(
     title="PW 30 — Monitoraggio produzione",
@@ -17,6 +17,7 @@ app = FastAPI(
 app.include_router(sistema.router, prefix="/api")
 app.include_router(anagrafica.router, prefix="/api")
 app.include_router(rilevazioni.router, prefix="/api")
+app.include_router(kpi.router, prefix="/api")
 
 
 # Traduzione dei tipi di errore più frequenti; per gli altri resta il messaggio originale.

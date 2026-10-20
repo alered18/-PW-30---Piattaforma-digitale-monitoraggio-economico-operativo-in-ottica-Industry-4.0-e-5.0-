@@ -16,7 +16,7 @@ from app.schemi.rilevazioni import (
     RilevazioneOut,
     UltimaRilevazione,
 )
-from app.servizi import ingestione
+from app.servizi import ingestione, ricalcolo
 from app.servizi.calendario import FUSO
 
 router = APIRouter(prefix="/rilevazioni", tags=["rilevazioni"])
@@ -33,7 +33,8 @@ MASSIMO_PER_BLOCCO = 10_000
 def ricevi(rilevazioni: list[RilevazioneIn], db: Session = Depends(sessione)):
     """Il blocco è accettato o rifiutato per intero: se anche una sola rilevazione non è valida non si memorizza
     nulla e la risposta elenca tutte le righe da correggere con i motivi. Le rilevazioni già presenti (stessa
-    macchina e stesso inizio) sono ignorate e contate tra i duplicati, così reinviare un blocco non fa danni."""
+    macchina e stesso inizio) sono ignorate e contate tra i duplicati, così reinviare un blocco non fa danni.
+    Dopo la memorizzazione si ricalcolano produzione giornaliera e indicatori dei giorni toccati."""
     if len(rilevazioni) > MASSIMO_PER_BLOCCO:
         raise HTTPException(status_code=422, detail=f"Al massimo {MASSIMO_PER_BLOCCO} rilevazioni per blocco")
     controllo = ingestione.controlla(db, rilevazioni)
@@ -44,6 +45,8 @@ def ricevi(rilevazioni: list[RilevazioneIn], db: Session = Depends(sessione)):
         )
         return JSONResponse(status_code=422, content=esito.model_dump(mode="json"))
     memorizzate, giorni = ingestione.memorizza(db, controllo.valide)
+    # I KPI dei giorni toccati si aggiornano subito, così la dashboard vede i dati nuovi.
+    ricalcolo.ricalcola(db, giorni)
     return EsitoIngestione(
         ricevute=len(rilevazioni),
         memorizzate=memorizzate,

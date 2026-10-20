@@ -147,6 +147,8 @@ CREATE TABLE indicatore (
     costo_materia_eur     numeric(12, 2) NOT NULL,
     costo_totale_eur      numeric(12, 2) NOT NULL,
     costo_unitario_eur    numeric(10, 4),
+    -- Dettaglio: valore perso negli scarti, già compreso nel costo della materia.
+    costo_scarti_eur      numeric(12, 2) NOT NULL,
     parziale              boolean     NOT NULL DEFAULT false,
     calcolato_il          timestamptz NOT NULL DEFAULT now(),
     -- Ambito: o la linea o una macchina, mai entrambe né nessuna.
