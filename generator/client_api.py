@@ -28,6 +28,10 @@ class ClientApi:
     def macchine(self) -> list[dict]:
         return self._richiesta("GET", "/macchine")
 
+    def ultime(self) -> list[dict]:
+        """Ultima rilevazione memorizzata di ogni macchina (None se non ce ne sono)."""
+        return self._richiesta("GET", "/rilevazioni/ultime")
+
     def invia(self, rilevazioni: list[dict]) -> dict:
         """Invia un blocco di rilevazioni e restituisce l'esito; se il back-end lo rifiuta solleva ErroreApi."""
         return self._richiesta("POST", "/rilevazioni", json=rilevazioni)

@@ -3,6 +3,7 @@
 from datetime import date, datetime
 
 from client_api import ClientApi
+from main import ripresa
 from simulatore.calendario import FUSO
 from simulatore.flusso import simula_storico
 from simulatore.macchina import DatiMacchina
@@ -53,6 +54,15 @@ def test_novanta_giorni_plausibili():
     oee_linea = buone * 1.8 / pianificato_s
     assert 0.60 <= oee_linea <= 0.85, oee_linea
     assert 0.02 <= scarti / (buone + scarti) <= 0.05
+
+
+def test_modalita_auto_riprende_dopo_l_ultima_rilevazione():
+    assert ripresa([{"macchina": "M1", "ultima": None}]) is None  # database vuoto: si genera lo storico
+    ultime = [
+        {"macchina": "M1", "ultima": {"inizio": "2026-10-16T21:58:00+02:00", "durata_s": 60}},
+        {"macchina": "M2", "ultima": {"inizio": "2026-10-16T21:59:00+02:00", "durata_s": 60}},
+    ]
+    assert ripresa(ultime) == datetime(2026, 10, 16, 22, 0, tzinfo=FUSO)
 
 
 def test_backend_spento_segnalato():
