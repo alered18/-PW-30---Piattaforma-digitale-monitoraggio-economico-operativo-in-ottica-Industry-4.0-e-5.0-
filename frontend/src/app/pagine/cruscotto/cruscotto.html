@@ -83,6 +83,11 @@
         </mat-card-content>
       </mat-card>
     }
+    <mat-card appearance="outlined" class="largo">
+      <mat-card-content>
+        <app-grafico-pareto [causali]="causali()" [errore]="!!servizio.ripartizioneFermi.error()" />
+      </mat-card-content>
+    </mat-card>
   </div>
 
   <h2>Valori per periodo</h2>

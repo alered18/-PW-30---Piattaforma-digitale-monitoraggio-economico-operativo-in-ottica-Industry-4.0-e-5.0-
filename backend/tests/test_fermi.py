@@ -38,6 +38,14 @@ def test_rilevazioni_contigue_con_la_stessa_causale_diventano_un_fermo(client):
     # Ricalcolare il giorno non duplica i fermi.
     client.post("/api/kpi/ricalcola", params={"da": GIORNO, "a": GIORNO})
     assert client.get("/api/fermi", params={"da": GIORNO, "a": GIORNO}).json() == fermi
+    # Ripartizione per causale (Pareto): stessi totali dell'elenco, dalla causale con più tempo di fermo.
+    ripartizione = client.get("/api/fermi/ripartizione", params={"da": GIORNO, "a": GIORNO}).json()
+    assert [(r["causale"], r["n_fermi"], r["durata_s"]) for r in ripartizione] == [
+        ("guasto", 2, 260), ("setup", 1, 120), ("manutenzione", 1, 60)]
+    assert sum(r["costo_eur"] for r in ripartizione) == pytest.approx(sum(f["costo_eur"] for f in fermi), abs=0.01)
+    solo_m2 = client.get("/api/fermi/ripartizione", params={"da": GIORNO, "a": GIORNO, "ambito": "M2"}).json()
+    assert [r["causale"] for r in solo_m2] == ["guasto", "manutenzione"]  # a pari durata, in ordine di codice
+
     anomalie = client.get("/api/anomalie", params={"da": GIORNO, "a": GIORNO, "tipo": "fermo", "macchina": "M3"})
     assert [a["descrizione"] for a in anomalie.json()] == ["M3: setup / cambio formato di 2 min",
                                                            "M3: guasto di 3 min 20 s"]

@@ -41,6 +41,15 @@ h2 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 12px;
+
+  // Il Pareto ha i nomi delle causali sull'asse: occupa due colonne quando c'è spazio.
+  .largo {
+    grid-column: span 2;
+
+    @media (max-width: 900px) {
+      grid-column: auto;
+    }
+  }
 }
 
 .riferimento {

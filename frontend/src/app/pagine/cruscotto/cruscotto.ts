@@ -10,7 +10,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { Grafico, GraficoAndamento } from '../../componenti/grafico-andamento/grafico-andamento';
-import { Granularita, PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
+import { GraficoPareto } from '../../componenti/grafico-pareto/grafico-pareto';
+import { CausaleRipartita, Granularita, PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
 import { dataBreve, etichettaPeriodo, Formato, formatta } from '../../servizi/formati';
 import { KpiService } from '../../servizi/kpi.service';
 
@@ -107,6 +108,7 @@ const GRAFICI: Grafico[] = [
   imports: [
     DatePipe,
     GraficoAndamento,
+    GraficoPareto,
     ReactiveFormsModule,
     MatButtonToggleModule,
     MatCardModule,
@@ -140,6 +142,14 @@ export class Cruscotto {
       return { valore: kpi.hasValue() ? kpi.value() : undefined, caricamento: kpi.isLoading() };
     },
     computation: (stato, precedente) => stato.valore ?? (stato.caricamento ? precedente?.value : undefined),
+  });
+  // Come per i KPI, durante il caricamento resta visibile la ripartizione precedente.
+  protected readonly causali = linkedSignal<CausaleRipartita[] | undefined, CausaleRipartita[]>({
+    source: () => {
+      const r = this.servizio.ripartizioneFermi;
+      return r.hasValue() ? r.value() : undefined;
+    },
+    computation: (valore, precedente) => valore ?? (this.servizio.ripartizioneFermi.isLoading() ? precedente?.value ?? [] : []),
   });
   // Se l'elenco delle macchine non arriva il filtro offre solo la linea (value() di una richiesta in errore solleva).
   protected readonly macchine = computed(() => (this.servizio.macchine.hasValue() ? this.servizio.macchine.value() : []));

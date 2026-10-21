@@ -27,3 +27,12 @@ class AnomaliaOut(BaseModel):
     valore: float | None = Field(description="Fermo: costo in euro; soglia: valore del KPI; dato: minuti scoperti")
     soglia: float | None
     descrizione: str
+
+
+class CausaleRipartita(BaseModel):
+    causale: str = Field(examples=["guasto"])
+    descrizione_causale: str
+    pianificato: bool
+    n_fermi: int
+    durata_s: int
+    costo_eur: float

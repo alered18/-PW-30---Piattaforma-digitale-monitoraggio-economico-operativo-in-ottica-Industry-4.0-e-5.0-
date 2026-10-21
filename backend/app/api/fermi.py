@@ -4,12 +4,12 @@ from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.sessione import sessione
 from app.db.tabelle import Anomalia, CausaleFermo, Macchina
-from app.schemi.fermi import AnomaliaOut, FermoOut
+from app.schemi.fermi import AnomaliaOut, CausaleRipartita, FermoOut
 
 router = APIRouter(tags=["fermi e anomalie"])
 
@@ -45,6 +45,30 @@ def elenco_fermi(
             durata_s=round((f.fine - f.inizio).total_seconds()), costo_eur=float(f.valore or 0),
         )
         for f, codice in righe
+    ]
+
+
+@router.get("/fermi/ripartizione", summary="Fermi per causale", response_model=list[CausaleRipartita])
+def ripartizione_fermi(
+    da: date = Query(description="Primo giorno incluso"),
+    a: date = Query(description="Ultimo giorno incluso"),
+    ambito: str = Query(default="linea", description="'linea' (tutte le macchine) oppure il codice di una macchina"),
+    db: Session = Depends(sessione),
+):
+    """Numero, durata e costo dei fermi di ogni causale nel periodo, dalla causale con più tempo di fermo: sono i dati
+    del diagramma di Pareto. I totali coincidono con la somma dell'elenco dei fermi con gli stessi filtri."""
+    filtro = _filtri(db, da, a, None if ambito == "linea" else ambito).where(Anomalia.tipo == "fermo").subquery()
+    durata = func.sum(func.extract("epoch", filtro.c.fine - filtro.c.inizio))
+    righe = db.execute(
+        select(CausaleFermo, func.count(), durata, func.sum(filtro.c.valore))
+        .join(filtro, filtro.c.causale_codice == CausaleFermo.codice)
+        .group_by(CausaleFermo.codice)
+        .order_by(durata.desc(), CausaleFermo.codice)
+    )
+    return [
+        CausaleRipartita(causale=c.codice, descrizione_causale=c.descrizione, pianificato=c.pianificata, n_fermi=n,
+                         durata_s=round(secondi), costo_eur=round(float(costo or 0), 2))
+        for c, n, secondi, costo in righe
     ]
 
 

@@ -52,3 +52,14 @@ export interface Macchina {
   nome: string;
   ordine: number;
 }
+
+/** Fermi di una causale nel periodo (dati del diagramma di Pareto). */
+export interface CausaleRipartita {
+  causale: string;
+  descrizione_causale: string;
+  /** Manutenzione programmata: fermo previsto, senza costo. */
+  pianificato: boolean;
+  n_fermi: number;
+  durata_s: number;
+  costo_eur: number;
+}

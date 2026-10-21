@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { effect, Injectable, signal } from '@angular/core';
-import { Granularita, Macchina, RispostaKpi } from '../modelli/kpi';
+import { CausaleRipartita, Granularita, Macchina, RispostaKpi } from '../modelli/kpi';
 import { dataIso } from './formati';
 
 export interface FiltriKpi {
@@ -36,6 +36,11 @@ export class KpiService {
     };
   });
 
+  readonly ripartizioneFermi = httpResource<CausaleRipartita[]>(() => {
+    const f = this.filtri();
+    return { url: '/api/fermi/ripartizione', params: { da: dataIso(f.da), a: dataIso(f.a), ambito: f.ambito } };
+  });
+
   readonly macchine = httpResource<Macchina[]>(() => '/api/macchine', { defaultValue: [] });
 
   /** Ora in cui sono arrivati gli ultimi KPI. */
@@ -51,7 +56,10 @@ export class KpiService {
   constructor() {
     effect((alTermine) => {
       if (!this.comprendeOggi()) return;
-      const timer = setInterval(() => this.kpi.reload(), AGGIORNAMENTO_MS);
+      const timer = setInterval(() => {
+        this.kpi.reload();
+        this.ripartizioneFermi.reload();
+      }, AGGIORNAMENTO_MS);
       alTermine(() => clearInterval(timer));
     });
     // Ogni risposta arrivata, anche se uguale alla precedente, è un nuovo oggetto: l'effetto riparte e segna l'ora.

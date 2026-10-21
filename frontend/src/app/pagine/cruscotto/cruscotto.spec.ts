@@ -6,17 +6,24 @@ import { Component, input, LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { GraficoAndamento } from '../../componenti/grafico-andamento/grafico-andamento';
+import { GraficoPareto } from '../../componenti/grafico-pareto/grafico-pareto';
 import { PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
 import { Cruscotto } from './cruscotto';
 
 registerLocaleData(localeIt);
 
-// Il DOM dei test non sa disegnare: al posto dei grafici un segnaposto con gli stessi input.
+// Il DOM dei test non sa disegnare: al posto dei grafici dei segnaposto con gli stessi input.
 @Component({ selector: 'app-grafico-andamento', template: '' })
 class GraficoFinto {
   readonly grafico = input();
   readonly serie = input();
   readonly granularita = input();
+}
+
+@Component({ selector: 'app-grafico-pareto', template: '' })
+class ParetoFinto {
+  readonly causali = input();
+  readonly errore = input();
 }
 
 const KPI: ValoriKpi = {
@@ -38,7 +45,10 @@ describe('Cruscotto', () => {
       providers: [provideHttpClient(), provideHttpClientTesting(), provideNativeDateAdapter(),
         { provide: LOCALE_ID, useValue: 'it-IT' }],
     });
-    TestBed.overrideComponent(Cruscotto, { remove: { imports: [GraficoAndamento] }, add: { imports: [GraficoFinto] } });
+    TestBed.overrideComponent(Cruscotto, {
+      remove: { imports: [GraficoAndamento, GraficoPareto] },
+      add: { imports: [GraficoFinto, ParetoFinto] },
+    });
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -47,6 +57,7 @@ describe('Cruscotto', () => {
     const fixture = TestBed.createComponent(Cruscotto);
     TestBed.tick();
     http.expectOne('/api/macchine').flush([{ codice: 'M3', nome: 'Essiccatoio', ordine: 3 }]);
+    http.expectOne((r) => r.url === '/api/fermi/ripartizione').flush([]);
     return fixture;
   }
 
