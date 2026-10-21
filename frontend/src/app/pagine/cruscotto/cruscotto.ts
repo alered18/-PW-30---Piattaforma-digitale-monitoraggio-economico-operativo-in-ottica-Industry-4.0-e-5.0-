@@ -9,6 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
+import { Grafico, GraficoAndamento } from '../../componenti/grafico-andamento/grafico-andamento';
 import { Granularita, PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
 import { dataBreve, etichettaPeriodo, Formato, formatta } from '../../servizi/formati';
 import { KpiService } from '../../servizi/kpi.service';
@@ -67,10 +68,45 @@ const GRUPPI: { titolo: string; indicatori: Indicatore[] }[] = [
   },
 ];
 
+/** Grafici della sezione "Andamenti". */
+const GRAFICI: Grafico[] = [
+  {
+    titolo: 'OEE e componenti',
+    formato: 'percentuale',
+    grandezze: [
+      { chiave: 'oee', nome: 'OEE' },
+      { chiave: 'disponibilita', nome: 'Disponibilità' },
+      { chiave: 'prestazioni', nome: 'Prestazioni' },
+      { chiave: 'qualita', nome: 'Qualità' },
+    ],
+  },
+  { titolo: 'Incidenza degli scarti', formato: 'percentuale', grandezze: [{ chiave: 'tasso_scarto', nome: 'Scarti' }] },
+  {
+    titolo: 'Consumo per confezione',
+    formato: 'decimale',
+    unita: 'kWh/conf',
+    grandezze: [{ chiave: 'kwh_conf', nome: 'kWh/conf' }],
+  },
+  {
+    titolo: 'Costo stimato dei fermi',
+    formato: 'euro',
+    tipo: 'bar',
+    grandezze: [{ chiave: 'costo_fermi_eur', nome: 'Costo dei fermi' }],
+  },
+  {
+    titolo: 'Emissioni di CO₂',
+    formato: 'intero',
+    unita: 'kg',
+    tipo: 'bar',
+    grandezze: [{ chiave: 'co2_kg', nome: 'CO₂' }],
+  },
+];
+
 @Component({
   selector: 'app-cruscotto',
   imports: [
     DatePipe,
+    GraficoAndamento,
     ReactiveFormsModule,
     MatButtonToggleModule,
     MatCardModule,
@@ -86,6 +122,7 @@ const GRUPPI: { titolo: string; indicatori: Indicatore[] }[] = [
 export class Cruscotto {
   protected readonly servizio = inject(KpiService);
   protected readonly gruppi = GRUPPI;
+  protected readonly grafici = GRAFICI;
   protected readonly oggi = new Date();
   protected readonly colonne = ['periodo', 'n_buoni', 'oee', 'tasso_scarto', 'kwh_conf', 'costo_fermi_eur'];
   protected readonly formatta = formatta;
@@ -108,6 +145,7 @@ export class Cruscotto {
   protected readonly macchine = computed(() => (this.servizio.macchine.hasValue() ? this.servizio.macchine.value() : []));
   protected readonly totale = computed(() => this.risposta()?.totale ?? null);
   protected readonly serie = computed(() => this.risposta()?.serie ?? []);
+  protected readonly granularita = computed(() => this.risposta()?.granularita ?? 'giorno');
 
   /** "dal 21/09/2026 al 20/10/2026 · Linea" */
   protected readonly riferimento = computed(() => {
@@ -133,7 +171,7 @@ export class Cruscotto {
 
   protected etichetta(punto: PuntoKpi): string {
     // La granularità della risposta, non quella dei filtri: durante il caricamento si vedono ancora i dati precedenti.
-    return etichettaPeriodo(punto, this.risposta()?.granularita ?? 'giorno');
+    return etichettaPeriodo(punto, this.granularita());
   }
 
   private nomeMacchina(codice: string): string {

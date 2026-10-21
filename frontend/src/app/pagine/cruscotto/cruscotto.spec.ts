@@ -2,13 +2,22 @@ import { registerLocaleData } from '@angular/common';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import localeIt from '@angular/common/locales/it';
-import { LOCALE_ID } from '@angular/core';
+import { Component, input, LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
+import { GraficoAndamento } from '../../componenti/grafico-andamento/grafico-andamento';
 import { PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
 import { Cruscotto } from './cruscotto';
 
 registerLocaleData(localeIt);
+
+// Il DOM dei test non sa disegnare: al posto dei grafici un segnaposto con gli stessi input.
+@Component({ selector: 'app-grafico-andamento', template: '' })
+class GraficoFinto {
+  readonly grafico = input();
+  readonly serie = input();
+  readonly granularita = input();
+}
 
 const KPI: ValoriKpi = {
   n_tot: 22800, n_buoni: 21950, n_scarti: 850, produzione_kg: 10975, produttivita_conf_h: 1371.9,
@@ -29,6 +38,7 @@ describe('Cruscotto', () => {
       providers: [provideHttpClient(), provideHttpClientTesting(), provideNativeDateAdapter(),
         { provide: LOCALE_ID, useValue: 'it-IT' }],
     });
+    TestBed.overrideComponent(Cruscotto, { remove: { imports: [GraficoAndamento] }, add: { imports: [GraficoFinto] } });
     http = TestBed.inject(HttpTestingController);
   });
 

@@ -74,7 +74,18 @@
     <p class="messaggio">Le prestazioni calcolate superavano il 100% e sono state limitate: dato da verificare.</p>
   }
 
-  <h2>Andamento per periodo</h2>
+  <h2>Andamenti</h2>
+  <div class="grafici">
+    @for (g of grafici; track g.titolo) {
+      <mat-card appearance="outlined">
+        <mat-card-content>
+          <app-grafico-andamento [grafico]="g" [serie]="serie()" [granularita]="granularita()" />
+        </mat-card-content>
+      </mat-card>
+    }
+  </div>
+
+  <h2>Valori per periodo</h2>
   <table mat-table [dataSource]="serie()" class="serie">
     <ng-container matColumnDef="periodo">
       <th mat-header-cell *matHeaderCellDef>Periodo</th>

@@ -37,6 +37,12 @@ h2 {
   }
 }
 
+.grafici {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 12px;
+}
+
 .riferimento {
   font: var(--mat-sys-body-large);
   margin: 8px 0 0;
