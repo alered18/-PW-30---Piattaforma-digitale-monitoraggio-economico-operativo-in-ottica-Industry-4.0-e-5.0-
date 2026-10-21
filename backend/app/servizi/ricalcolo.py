@@ -1,5 +1,5 @@
-"""Ricalcolo giornaliero: dalle rilevazioni di un giorno alla produzione giornaliera, agli indicatori e alle
-anomalie di dato.
+"""Ricalcolo giornaliero: dalle rilevazioni di un giorno alla produzione giornaliera, agli indicatori, ai fermi e
+alle anomalie di dato.
 
 Il ricalcolo di un giorno è idempotente: cancella e riscrive le righe di quel giorno, quindi ripeterlo con gli
 stessi dati dà sempre lo stesso risultato. Viene eseguito dopo ogni blocco di rilevazioni ricevuto e su richiesta,
@@ -30,6 +30,7 @@ from app.kpi.formule import (
     kpi_linea,
     kpi_macchina,
 )
+from app.servizi import fermi
 from app.servizi.calendario import FUSO, chiusura, giorno_di, secondi_disponibili
 
 # Sotto il minuto un buco tra le rilevazioni è solo un arrotondamento, non un dato mancante.
@@ -124,6 +125,7 @@ def ricalcola_giorno(db: Session, giorno: date, adesso: datetime | None = None) 
 
     k_linea = kpi_linea(basi, dati_macchine, parametri)
     db.add(_indicatore(giorno, k_linea, parziale, linea_id=linea.id))
+    fermi.ricostruisci(db, giorno, macchine, dati_macchine, parametri, capacita)
     return True
 
 

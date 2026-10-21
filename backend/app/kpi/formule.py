@@ -132,6 +132,25 @@ def valore_produzione_persa_h(capacita_linea_conf_h: float, parametri: Parametri
     return capacita_linea_conf_h * parametri.margine_conf
 
 
+def costo_fermo(
+    durata_s: float,
+    macchina: DatiMacchina,
+    parametri: ParametriEconomici,
+    capacita_linea_conf_h: float,
+) -> float:
+    """Costo di un tempo di fermo non pianificato di una macchina (un singolo fermo o la somma di una giornata).
+
+    Il costo orario della macchina ferma c'è sempre. La produzione persa dalla linea si conta solo per la macchina
+    più lenta: i fermi delle altre, più veloci, sono assorbiti dai buffer e recuperati, mentre ogni minuto perso dal
+    collo di bottiglia è produzione che la linea non recupera più. Contarla per tutte le macchine sommerebbe più
+    volte la stessa perdita. Se più macchine avessero la stessa capacità minima, sarebbero tutte collo di bottiglia
+    e la conterebbero ciascuna (non è il caso di questa linea).
+    """
+    collo_di_bottiglia = macchina.capacita_conf_h <= capacita_linea_conf_h
+    produzione_persa_h = valore_produzione_persa_h(capacita_linea_conf_h, parametri) if collo_di_bottiglia else 0.0
+    return (durata_s / SECONDI_ORA) * (macchina.costo_orario_eur + produzione_persa_h)
+
+
 def _efficienza(
     t_pian_s: int, t_funz_s: int, n_tot: int, n_buoni: int, tempo_ciclo_ideale_h: float
 ) -> tuple[float | None, float | None, float | None, float | None, bool]:
@@ -170,14 +189,7 @@ def kpi_macchina(
     disponibilita, prestazioni, qualita, oee, limitate = _efficienza(
         base.t_pian_s, base.t_funz_s, base.n_tot, base.n_buoni, macchina.tempo_ciclo_ideale_h
     )
-    # Costo dei fermi non pianificati: il costo orario della macchina ferma c'è sempre. La produzione persa dalla
-    # linea si conta solo per la macchina più lenta: i fermi delle altre, più veloci, sono assorbiti dai buffer e
-    # recuperati, mentre ogni minuto perso dal collo di bottiglia è produzione che la linea non recupera più.
-    # Contarla per tutte le macchine sommerebbe più volte la stessa perdita. Se più macchine avessero la stessa
-    # capacità minima, sarebbero tutte collo di bottiglia e la conterebbero ciascuna (non è il caso di questa linea).
-    collo_di_bottiglia = macchina.capacita_conf_h <= capacita_linea_conf_h
-    produzione_persa_h = valore_produzione_persa_h(capacita_linea_conf_h, parametri) if collo_di_bottiglia else 0.0
-    costo_fermi = (base.t_fermo_s / SECONDI_ORA) * (macchina.costo_orario_eur + produzione_persa_h)
+    costo_fermi = costo_fermo(base.t_fermo_s, macchina, parametri, capacita_linea_conf_h)
     co2 = base.kwh * parametri.fattore_co2
     costo_macchina = t_pian_h * macchina.costo_orario_eur
     costo_energia = base.kwh * parametri.prezzo_energia
