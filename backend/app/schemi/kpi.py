@@ -32,12 +32,21 @@ class ValoriKpi(BaseModel):
     prestazioni_limitate: bool = Field(description="Prestazioni calcolate oltre il 100% e limitate: dato da verificare")
 
 
+class SogliaOut(BaseModel):
+    kpi: str = Field(examples=["oee"])
+    verso: Literal["min", "max"] = Field(description="min: fuori soglia se inferiore; max: fuori soglia se superiore")
+    valore: float
+
+
 class PuntoKpi(BaseModel):
     periodo: str = Field(examples=["2026-W42"], description="Giorno (2026-10-12), settimana ISO (2026-W42) o mese (2026-10)")
     da: date
     a: date
     parziale: bool = Field(description="Periodo incompleto: giorno in corso, dati mancanti o tagliato dall'intervallo")
     kpi: ValoriKpi
+    stato_soglie: dict[str, Literal["ok", "fuori_soglia", "nd"]] = Field(
+        description="Stato dei KPI che hanno una soglia; il costo dei fermi (€/giorno) solo per periodi di un giorno",
+        examples=[{"oee": "fuori_soglia", "tasso_scarto": "ok"}])
 
 
 class RispostaKpi(BaseModel):
@@ -45,5 +54,6 @@ class RispostaKpi(BaseModel):
     granularita: Literal["giorno", "settimana", "mese"]
     da: date
     a: date
+    soglie: list[SogliaOut] = Field(description="Soglie che valgono per l'ambito richiesto")
     serie: list[PuntoKpi]
     totale: PuntoKpi | None = Field(description="KPI dell'intero intervallo richiesto; null se non ci sono dati")

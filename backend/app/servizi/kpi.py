@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.tabelle import Macchina, Parametro, ProduzioneGiornaliera
 from app.kpi.formule import GrandezzeBase, capacita_linea, kpi_linea, kpi_macchina, produzione_kg, somma
-from app.servizi import ricalcolo
+from app.servizi import ricalcolo, soglie
 from app.servizi.calendario import FUSO, giorno_di, lavorativo
 
 @dataclass
@@ -51,6 +51,7 @@ def leggi(db: Session, ambito: str, da: date, a: date, granularita: str, adesso:
     parametri = ricalcolo.parametri_economici(db)
     peso_conf = float(db.get(Parametro, "peso_conf").valore)
     capacita = capacita_linea(dati.values())
+    regole = soglie.regole(db, ambito)
 
     # Grandezze di base per giorno e macchina nell'intervallo.
     per_giorno: dict[date, dict[str, GrandezzeBase]] = defaultdict(dict)
@@ -80,22 +81,25 @@ def leggi(db: Session, ambito: str, da: date, a: date, granularita: str, adesso:
         attesi = _giorni_lavorativi_trascorsi(max(periodo.da, da), min(periodo.a, a), oggi)
         return bool(parziali & set(giorni)) or periodo.da < da or periodo.a > a or not attesi <= set(giorni)
 
+    def punto(etichetta: str, inizio: date, fine: date, incompleto: bool, valori: dict) -> dict:
+        return {"periodo": etichetta, "da": inizio, "a": fine, "parziale": incompleto, "kpi": valori,
+                "stato_soglie": soglie.stati(valori, regole, un_giorno=inizio == fine)}
+
     gruppi: dict[str, tuple[Periodo, list[date]]] = {}
     for g in sorted(per_giorno):
         periodo = periodo_di(g, granularita)
         gruppi.setdefault(periodo.etichetta, (periodo, []))[1].append(g)
 
     serie = [
-        {"periodo": p.etichetta, "da": p.da, "a": p.a, "parziale": parziale(p, giorni), "kpi": calcola(giorni)}
-        for p, giorni in gruppi.values()
+        punto(p.etichetta, p.da, p.a, parziale(p, giorni), calcola(giorni)) for p, giorni in gruppi.values()
     ]
     tutti = sorted(per_giorno)
     totale = None
     if tutti:
         intero = Periodo(f"{da.isoformat()}/{a.isoformat()}", da, a)
-        totale = {"periodo": intero.etichetta, "da": da, "a": a, "parziale": parziale(intero, tutti),
-                  "kpi": calcola(tutti)}
-    return {"ambito": ambito, "granularita": granularita, "da": da, "a": a, "serie": serie, "totale": totale}
+        totale = punto(intero.etichetta, da, a, parziale(intero, tutti), calcola(tutti))
+    return {"ambito": ambito, "granularita": granularita, "da": da, "a": a, "soglie": [asdict(r) for r in regole],
+            "serie": serie, "totale": totale}
 
 
 def _completa_giorni_rimasti_parziali(db: Session, da: date, a: date, adesso: datetime) -> None:

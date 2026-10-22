@@ -1,11 +1,12 @@
-"""Ricalcolo giornaliero: dalle rilevazioni di un giorno alla produzione giornaliera, agli indicatori, ai fermi e
-alle anomalie di dato.
+"""Ricalcolo giornaliero: dalle rilevazioni di un giorno alla produzione giornaliera, agli indicatori, ai fermi, agli
+alert delle soglie e alle anomalie di dato.
 
 Il ricalcolo di un giorno è idempotente: cancella e riscrive le righe di quel giorno, quindi ripeterlo con gli
 stessi dati dà sempre lo stesso risultato. Viene eseguito dopo ogni blocco di rilevazioni ricevuto e su richiesta,
 ad esempio dopo una modifica dei parametri economici.
 """
 
+from dataclasses import asdict
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import case, delete, func, select
@@ -30,7 +31,7 @@ from app.kpi.formule import (
     kpi_linea,
     kpi_macchina,
 )
-from app.servizi import fermi
+from app.servizi import fermi, soglie
 from app.servizi.calendario import FUSO, chiusura, giorno_di, secondi_disponibili
 
 # Sotto il minuto un buco tra le rilevazioni è solo un arrotondamento, non un dato mancante.
@@ -99,6 +100,7 @@ def ricalcola_giorno(db: Session, giorno: date, adesso: datetime | None = None) 
     t_disp = secondi_disponibili(giorno, ultima if parziale else None)
 
     basi: dict[str, GrandezzeBase] = {}
+    valori: list[tuple[Macchina | None, dict]] = []
     db.execute(delete(ProduzioneGiornaliera).where(ProduzioneGiornaliera.data == giorno))
     db.execute(delete(Indicatore).where(Indicatore.data == giorno))
     db.execute(delete(Anomalia).where(Anomalia.data == giorno, Anomalia.tipo == "dato"))
@@ -121,11 +123,14 @@ def ricalcola_giorno(db: Session, giorno: date, adesso: datetime | None = None) 
         ))
         k = kpi_macchina(base, dati, parametri, capacita)
         db.add(_indicatore(giorno, k, parziale, macchina_id=m.id))
+        valori.append((m, asdict(k)))
         _anomalie_di_dato(db, giorno, m, k, t_disp - int(s.get("coperto_s") or 0))
 
     k_linea = kpi_linea(basi, dati_macchine, parametri)
     db.add(_indicatore(giorno, k_linea, parziale, linea_id=linea.id))
+    valori.append((None, asdict(k_linea)))
     fermi.ricostruisci(db, giorno, macchine, dati_macchine, parametri, capacita)
+    soglie.ricostruisci(db, giorno, valori)
     return True
 
 
