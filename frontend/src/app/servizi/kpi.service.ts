@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { effect, Injectable, signal } from '@angular/core';
-import { CausaleRipartita, Granularita, Macchina, RispostaKpi } from '../modelli/kpi';
+import { Alert, CausaleRipartita, Granularita, Macchina, RispostaKpi } from '../modelli/kpi';
 import { dataIso } from './formati';
 
 export interface FiltriKpi {
@@ -41,6 +41,14 @@ export class KpiService {
     return { url: '/api/fermi/ripartizione', params: { da: dataIso(f.da), a: dataIso(f.a), ambito: f.ambito } };
   });
 
+  /** Superamenti di soglia del periodo: per la linea anche quelli delle singole macchine. */
+  readonly alert = httpResource<Alert[]>(() => {
+    const f = this.filtri();
+    const params: Record<string, string> = { da: dataIso(f.da), a: dataIso(f.a), tipo: 'soglia' };
+    if (f.ambito !== 'linea') params['macchina'] = f.ambito;
+    return { url: '/api/anomalie', params };
+  });
+
   readonly macchine = httpResource<Macchina[]>(() => '/api/macchine', { defaultValue: [] });
 
   /** Ora in cui sono arrivati gli ultimi KPI. */
@@ -59,6 +67,7 @@ export class KpiService {
       const timer = setInterval(() => {
         this.kpi.reload();
         this.ripartizioneFermi.reload();
+        this.alert.reload();
       }, AGGIORNAMENTO_MS);
       alTermine(() => clearInterval(timer));
     });

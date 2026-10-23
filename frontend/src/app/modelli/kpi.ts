@@ -36,6 +36,37 @@ export interface PuntoKpi {
   /** Periodo incompleto: giorno in corso, dati mancanti o tagliato dall'intervallo. */
   parziale: boolean;
   kpi: ValoriKpi;
+  /** Stato dei KPI che hanno una soglia; il costo dei fermi (€/giorno) compare solo nei periodi di un giorno. */
+  stato_soglie: Partial<Record<keyof ValoriKpi, StatoSoglia>>;
+}
+
+/** 'nd': KPI non calcolabile, mai considerato fuori soglia. */
+export type StatoSoglia = 'ok' | 'fuori_soglia' | 'nd';
+
+/** min: fuori soglia se il valore è inferiore; max: fuori soglia se è superiore. */
+export type Verso = 'min' | 'max';
+
+export interface SogliaKpi {
+  kpi: keyof ValoriKpi;
+  verso: Verso;
+  valore: number;
+}
+
+/** Soglia completa, come la restituisce /api/soglie. */
+export interface Soglia extends SogliaKpi {
+  nome: string;
+  ambito: 'linea' | 'macchina';
+}
+
+/** Superamento di una soglia registrato per un giorno (anomalia di tipo "soglia"). */
+export interface Alert {
+  data: string;
+  /** Codice della macchina; null se riferito alla linea. */
+  macchina: string | null;
+  kpi: keyof ValoriKpi;
+  valore: number;
+  soglia: number;
+  descrizione: string;
 }
 
 export interface RispostaKpi {
@@ -43,6 +74,8 @@ export interface RispostaKpi {
   granularita: Granularita;
   da: string;
   a: string;
+  /** Soglie che valgono per l'ambito richiesto. */
+  soglie: SogliaKpi[];
   serie: PuntoKpi[];
   totale: PuntoKpi | null;
 }

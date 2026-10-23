@@ -6,12 +6,13 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { Grafico, GraficoAndamento } from '../../componenti/grafico-andamento/grafico-andamento';
 import { GraficoPareto } from '../../componenti/grafico-pareto/grafico-pareto';
-import { CausaleRipartita, Granularita, PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
+import { Alert, CausaleRipartita, Granularita, PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
 import { dataBreve, etichettaPeriodo, Formato, formatta } from '../../servizi/formati';
 import { KpiService } from '../../servizi/kpi.service';
 
@@ -69,6 +70,14 @@ const GRUPPI: { titolo: string; indicatori: Indicatore[] }[] = [
   },
 ];
 
+/** Nome, formato e unità di ogni KPI delle card, per le soglie e l'elenco degli alert. */
+const INDICATORI = new Map(GRUPPI.flatMap((g) => g.indicatori).map((i) => [i.chiave, i]));
+
+/** "0,250 kWh/conf", "65,0%": valore nel formato del KPI, con l'unità di misura se ne ha una. */
+function conUnita(valore: number, indicatore: Indicatore): string {
+  return formatta(valore, indicatore.formato) + (indicatore.unita ? ` ${indicatore.unita}` : '');
+}
+
 /** Grafici della sezione "Andamenti". */
 const GRAFICI: Grafico[] = [
   {
@@ -114,6 +123,7 @@ const GRAFICI: Grafico[] = [
     MatCardModule,
     MatDatepickerModule,
     MatFormFieldModule,
+    MatIconModule,
     MatProgressBarModule,
     MatSelectModule,
     MatTableModule,
@@ -126,6 +136,8 @@ export class Cruscotto {
   protected readonly gruppi = GRUPPI;
   protected readonly grafici = GRAFICI;
   protected readonly oggi = new Date();
+  protected readonly colonneAlert = ['data', 'ambito', 'kpi', 'valore', 'soglia'];
+  protected readonly dataBreve = dataBreve;
   protected readonly colonne = ['periodo', 'n_buoni', 'oee', 'tasso_scarto', 'kwh_conf', 'costo_fermi_eur'];
   protected readonly formatta = formatta;
 
@@ -156,6 +168,8 @@ export class Cruscotto {
   protected readonly totale = computed(() => this.risposta()?.totale ?? null);
   protected readonly serie = computed(() => this.risposta()?.serie ?? []);
   protected readonly granularita = computed(() => this.risposta()?.granularita ?? 'giorno');
+  protected readonly soglie = computed(() => this.risposta()?.soglie ?? []);
+  protected readonly alert = computed(() => (this.servizio.alert.hasValue() ? this.servizio.alert.value() : []));
 
   /** "dal 21/09/2026 al 20/10/2026 · Linea" */
   protected readonly riferimento = computed(() => {
@@ -182,6 +196,32 @@ export class Cruscotto {
   protected etichetta(punto: PuntoKpi): string {
     // La granularità della risposta, non quella dei filtri: durante il caricamento si vedono ancora i dati precedenti.
     return etichettaPeriodo(punto, this.granularita());
+  }
+
+  /**
+   * Riga sotto il valore della card per i KPI con una soglia valutata nel periodo:
+   * "Sotto la soglia minima di 65,0%" se il KPI è fuori soglia, altrimenti "Soglia minima 65,0%".
+   */
+  protected testoSoglia(punto: PuntoKpi, indicatore: Indicatore): { fuori: boolean; testo: string } | null {
+    const stato = punto.stato_soglie[indicatore.chiave];
+    const soglia = this.soglie().find((s) => s.kpi === indicatore.chiave);
+    if (!stato || !soglia) return null;
+    const valore = conUnita(soglia.valore, indicatore);
+    if (stato === 'fuori_soglia') {
+      const confronto = soglia.verso === 'min' ? 'Sotto la soglia minima' : 'Sopra la soglia massima';
+      return { fuori: true, testo: `${confronto} di ${valore}` };
+    }
+    return { fuori: false, testo: `Soglia ${soglia.verso === 'min' ? 'minima' : 'massima'} ${valore}` };
+  }
+
+  protected nomeKpi(alert: Alert): string {
+    return INDICATORI.get(alert.kpi)?.nome ?? alert.kpi;
+  }
+
+  /** Valore o soglia di un alert nel formato del suo KPI. */
+  protected formattaAlert(alert: Alert, valore: number): string {
+    const indicatore = INDICATORI.get(alert.kpi);
+    return indicatore ? conUnita(valore, indicatore) : formatta(valore, 'decimale');
   }
 
   private nomeMacchina(codice: string): string {

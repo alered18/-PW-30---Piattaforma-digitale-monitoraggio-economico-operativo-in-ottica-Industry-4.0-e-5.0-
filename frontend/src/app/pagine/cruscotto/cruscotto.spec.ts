@@ -7,7 +7,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { GraficoAndamento } from '../../componenti/grafico-andamento/grafico-andamento';
 import { GraficoPareto } from '../../componenti/grafico-pareto/grafico-pareto';
-import { PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
+import { Alert, PuntoKpi, RispostaKpi, ValoriKpi } from '../../modelli/kpi';
 import { Cruscotto } from './cruscotto';
 
 registerLocaleData(localeIt);
@@ -18,6 +18,7 @@ class GraficoFinto {
   readonly grafico = input();
   readonly serie = input();
   readonly granularita = input();
+  readonly soglie = input();
 }
 
 @Component({ selector: 'app-grafico-pareto', template: '' })
@@ -34,7 +35,9 @@ const KPI: ValoriKpi = {
   costo_macchina_eur: 3200, costo_energia_eur: 904.3, costo_materia_eur: 5700, costo_totale_eur: 10096.7,
   costo_unitario_eur: 0.46, costo_scarti_eur: 212.5, prestazioni_limitate: false,
 };
-const GIORNO: PuntoKpi = { periodo: '2026-10-16', da: '2026-10-16', a: '2026-10-16', parziale: false, kpi: KPI };
+const GIORNO: PuntoKpi = {
+  periodo: '2026-10-16', da: '2026-10-16', a: '2026-10-16', parziale: false, kpi: KPI, stato_soglie: {},
+};
 
 describe('Cruscotto', () => {
   let http: HttpTestingController;
@@ -52,19 +55,23 @@ describe('Cruscotto', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  async function apri() {
+  async function apri(alert: Alert[] = []) {
     // whenStable() attenderebbe le richieste ancora aperte: tick() le fa solo partire, così il test può rispondere.
     const fixture = TestBed.createComponent(Cruscotto);
     TestBed.tick();
     http.expectOne('/api/macchine').flush([{ codice: 'M3', nome: 'Essiccatoio', ordine: 3 }]);
     http.expectOne((r) => r.url === '/api/fermi/ripartizione').flush([]);
+    http.expectOne((r) => r.url === '/api/anomalie' && r.params.get('tipo') === 'soglia').flush(alert);
     return fixture;
   }
 
-  function card(fixture: { nativeElement: HTMLElement }, nome: string): string | undefined {
+  function trovaCard(fixture: { nativeElement: HTMLElement }, nome: string): Element | undefined {
     const tutte = Array.from(fixture.nativeElement.querySelectorAll('.indicatore'));
-    const trovata = tutte.find((c) => c.querySelector('.nome')?.textContent?.trim() === nome);
-    return trovata?.querySelector('.valore')?.textContent?.replace(/\s+/g, ' ').trim();
+    return tutte.find((c) => c.querySelector('.nome')?.textContent?.trim() === nome);
+  }
+
+  function card(fixture: { nativeElement: HTMLElement }, nome: string): string | undefined {
+    return trovaCard(fixture, nome)?.querySelector('.valore')?.textContent?.replace(/\s+/g, ' ').trim();
   }
 
   it('mostra i KPI del periodo in formato italiano e "n.d." per quelli non calcolabili', async () => {
@@ -72,7 +79,8 @@ describe('Cruscotto', () => {
     const richiesta = http.expectOne((r) => r.url === '/api/kpi');
     expect(richiesta.request.params.get('ambito')).toBe('linea');
     const risposta: RispostaKpi = {
-      ambito: 'linea', granularita: 'giorno', da: '2026-10-16', a: '2026-10-16', serie: [GIORNO], totale: GIORNO,
+      ambito: 'linea', granularita: 'giorno', da: '2026-10-16', a: '2026-10-16', soglie: [], serie: [GIORNO],
+      totale: GIORNO,
     };
     richiesta.flush(risposta);
     await fixture.whenStable();
@@ -86,10 +94,41 @@ describe('Cruscotto', () => {
     expect(fixture.nativeElement.textContent).toContain('dal 16/10/2026 al 16/10/2026 · Linea');
   });
 
+  it('evidenzia i KPI fuori soglia con colore, icona e testo ed elenca gli alert del periodo', async () => {
+    const alert: Alert[] = [{
+      data: '2026-10-16', macchina: null, kpi: 'oee', valore: 0.582, soglia: 0.65,
+      descrizione: 'Linea: OEE 58,2% sotto la soglia minima di 65,0%',
+    }];
+    const fixture = await apri(alert);
+    const giorno: PuntoKpi = {
+      ...GIORNO, kpi: { ...KPI, oee: 0.582 }, stato_soglie: { oee: 'fuori_soglia', tasso_scarto: 'ok' },
+    };
+    http.expectOne((r) => r.url === '/api/kpi').flush({
+      ambito: 'linea', granularita: 'giorno', da: '2026-10-16', a: '2026-10-16', serie: [giorno], totale: giorno,
+      soglie: [{ kpi: 'oee', verso: 'min', valore: 0.65 }, { kpi: 'tasso_scarto', verso: 'max', valore: 0.05 }],
+    } satisfies RispostaKpi);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // Il KPI fuori soglia non è segnalato solo dal colore: ci sono anche l'icona e il testo.
+    const oee = trovaCard(fixture, 'OEE')!;
+    expect(oee.classList).toContain('fuori-soglia');
+    expect(oee.querySelector('mat-icon')?.textContent).toBe('warning');
+    expect(oee.querySelector('.soglia')?.textContent).toContain('Sotto la soglia minima di 65,0%');
+    // In soglia: solo il riferimento, senza evidenza.
+    const scarti = trovaCard(fixture, 'Incidenza degli scarti')!;
+    expect(scarti.classList).not.toContain('fuori-soglia');
+    expect(scarti.querySelector('mat-icon')).toBeNull();
+    expect(scarti.querySelector('.soglia')?.textContent?.trim()).toBe('Soglia massima 5,0%');
+
+    const celle = fixture.nativeElement.querySelectorAll('.elenco-alert td') as NodeListOf<HTMLElement>;
+    expect(Array.from(celle, (c) => c.textContent?.trim())).toEqual(['16/10/2026', 'Linea', 'OEE', '58,2%', '65,0%']);
+  });
+
   it('richiede di nuovo i KPI quando cambiano granularità e ambito', async () => {
     const fixture = await apri();
     http.expectOne((r) => r.url === '/api/kpi').flush({ ambito: 'linea', granularita: 'giorno', da: '2026-10-16',
-      a: '2026-10-16', serie: [], totale: null });
+      a: '2026-10-16', soglie: [], serie: [], totale: null });
     await fixture.whenStable();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Nessun dato nel periodo selezionato');

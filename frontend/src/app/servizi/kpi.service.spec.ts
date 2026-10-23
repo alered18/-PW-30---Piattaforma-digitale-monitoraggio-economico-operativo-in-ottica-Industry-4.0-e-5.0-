@@ -24,11 +24,11 @@ describe('KpiService', () => {
     TestBed.tick();
     http.match('/api/macchine').forEach((r) => r.flush([]));
     http.expectOne((r) => r.url === '/api/kpi').flush({ serie: [], totale: null });
-    http.match((r) => r.url === '/api/fermi/ripartizione').forEach((r) => r.flush([]));
+    http.match((r) => r.url === '/api/fermi/ripartizione' || r.url === '/api/anomalie').forEach((r) => r.flush([]));
     await TestBed.inject(ApplicationRef).whenStable();
   }
 
-  it('rilegge KPI e fermi ogni 10 secondi solo se il periodo comprende oggi', async () => {
+  it('rilegge KPI, fermi e alert ogni 10 secondi solo se il periodo comprende oggi', async () => {
     await rispondi(); // di default gli ultimi 30 giorni, quindi anche oggi
     vi.advanceTimersByTime(AGGIORNAMENTO_MS);
     await rispondi();
@@ -37,6 +37,6 @@ describe('KpiService', () => {
     await rispondi();
     vi.advanceTimersByTime(3 * AGGIORNAMENTO_MS);
     TestBed.tick();
-    http.expectNone((r) => r.url === '/api/kpi' || r.url === '/api/fermi/ripartizione');
+    http.expectNone((r) => ['/api/kpi', '/api/fermi/ripartizione', '/api/anomalie'].includes(r.url));
   });
 });

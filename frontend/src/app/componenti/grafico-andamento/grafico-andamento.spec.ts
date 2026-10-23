@@ -1,12 +1,12 @@
 import { registerLocaleData } from '@angular/common';
 import localeIt from '@angular/common/locales/it';
-import { PuntoKpi, ValoriKpi } from '../../modelli/kpi';
+import { PuntoKpi, SogliaKpi, ValoriKpi } from '../../modelli/kpi';
 import { Grafico, opzioniAndamento } from './grafico-andamento';
 
 registerLocaleData(localeIt);
 
 function punto(da: string, oee: number | null, disponibilita: number, parziale = false): PuntoKpi {
-  return { periodo: da, da, a: da, parziale, kpi: { oee, disponibilita } as ValoriKpi };
+  return { periodo: da, da, a: da, parziale, kpi: { oee, disponibilita } as ValoriKpi, stato_soglie: {} };
 }
 
 describe('opzioniAndamento', () => {
@@ -33,5 +33,20 @@ describe('opzioniAndamento', () => {
       { dataIndex: 1, marker: '', seriesName: 'Disponibilità', value: 0.9 },
     ]);
     expect(tooltip).toBe('ven 16/10/2026 (parziale)<br> OEE: <b>n.d.</b><br> Disponibilità: <b>90,0%</b>');
+  });
+
+  it('disegna la soglia dei KPI del grafico come linea tratteggiata; quella del costo dei fermi solo per giorno', () => {
+    const soglie: SogliaKpi[] = [
+      { kpi: 'oee', verso: 'min', valore: 0.65 },
+      { kpi: 'costo_fermi_eur', verso: 'max', valore: 2500 },
+    ];
+    const opzioni = opzioniAndamento(grafico, serie, 'giorno', soglie) as any;
+    const soglia = opzioni.series[2];
+    expect([soglia.name, soglia.data, soglia.lineStyle.type]).toEqual(['Soglia OEE', [0.65, 0.65], 'dashed']);
+    expect(opzioni.series).toHaveLength(3); // la soglia del costo dei fermi non riguarda questo grafico
+
+    const costo: Grafico = { titolo: 'Costo', formato: 'euro', grandezze: [{ chiave: 'costo_fermi_eur', nome: 'Costo' }] };
+    expect((opzioniAndamento(costo, serie, 'giorno', soglie) as any).series[1].name).toBe('Soglia massima');
+    expect((opzioniAndamento(costo, serie, 'settimana', soglie) as any).series).toHaveLength(1);
   });
 });

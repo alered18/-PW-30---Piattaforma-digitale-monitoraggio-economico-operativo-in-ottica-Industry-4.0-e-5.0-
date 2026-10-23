@@ -35,6 +35,56 @@ h2 {
     font: var(--mat-sys-body-medium);
     color: var(--mat-sys-on-surface-variant);
   }
+
+  .soglia {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font: var(--mat-sys-body-small);
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  &.fuori-soglia {
+    background: var(--mat-sys-error-container);
+    border-color: var(--mat-sys-error);
+
+    .nome,
+    .valore,
+    .unita,
+    .soglia {
+      color: var(--mat-sys-on-error-container);
+    }
+
+    .soglia {
+      font-weight: 500;
+    }
+  }
+}
+
+// Con molti alert l'elenco scorre al suo interno, con l'intestazione sempre visibile.
+.elenco-alert {
+  max-height: 320px;
+  overflow: auto;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+
+  table {
+    min-width: 560px;
+  }
+
+  .fuori {
+    color: var(--mat-sys-error);
+    font-weight: 500;
+  }
 }
 
 .grafici {
