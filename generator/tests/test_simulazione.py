@@ -1,6 +1,7 @@
 """Test della simulazione, senza back-end."""
 
 from dataclasses import asdict
+from functools import cache
 from datetime import date, datetime, timedelta
 
 from client_api import ClientApi
@@ -9,6 +10,7 @@ from main import live, ripresa
 from simulatore.calendario import FUSO
 from simulatore.flusso import simula_storico
 from simulatore.macchina import DatiMacchina
+from simulatore.scenari import Scenari
 
 # Stessa anagrafica del database: capacità (conf/h), potenza in funzione e a fermo (kW), scarto nominale.
 MACCHINE = [
@@ -21,9 +23,9 @@ MACCHINE = [
 FINE = datetime(2026, 10, 16, 22, 0, tzinfo=FUSO)  # venerdì
 
 
-def storico(seme: int, giorni: int) -> list[dict]:
+def storico(seme: int, giorni: int, scenari: Scenari | None = None) -> list[dict]:
     da = FINE.date().fromordinal(FINE.date().toordinal() - giorni)
-    return [r for _, blocco in simula_storico(MACCHINE, seme, da, FINE) for r in blocco]
+    return [r for _, blocco in simula_storico(MACCHINE, seme, da, FINE, scenari=scenari) for r in blocco]
 
 
 def test_stesso_seme_stessi_dati():
@@ -101,3 +103,57 @@ def test_live_un_blocco_ogni_5_secondi_solo_in_orario_di_turno():
     assert blocchi[0][0]["inizio"] == "2026-10-16T10:00:00+02:00" and blocchi[0][0]["durata_s"] == 5
     # A cavallo della chiusura delle 22:00 si inviano solo i passi che finiscono entro l'orario di turno.
     assert len(esegui_live(datetime(2026, 10, 16, 21, 59, 30, tzinfo=FUSO), 1)) == 6
+
+
+# --- Scenari: 90 giorni con tutti gli scenari attivi, generati una sola volta per i tre test seguenti ---
+
+SCENARI = Scenari(FINE.date(), {"degrado_trafila", "mancanze_materiale", "guasto_grave"})
+
+
+@cache
+def storico_con_scenari() -> tuple[dict, ...]:
+    return tuple(storico(42, 90, SCENARI))
+
+
+def rilevazioni(macchina: str, da: date, a: date) -> list[dict]:
+    return [r for r in storico_con_scenari()
+            if r["macchina"] == macchina and da <= datetime.fromisoformat(r["inizio"]).date() <= a]
+
+
+def test_degrado_trafila_scarto_crescente_poi_normale():
+    inizio, fine = SCENARI.degrado
+    assert (inizio, fine) == (date(2026, 8, 31), date(2026, 9, 18))  # tre settimane, dal lunedì al venerdì
+
+    def scarto(da: date, a: date) -> float:
+        m2 = rilevazioni("M2", da, a)
+        return sum(r["scarti"] for r in m2) / sum(r["pezzi"] for r in m2)
+
+    settimane = [scarto(inizio + timedelta(weeks=s), inizio + timedelta(weeks=s, days=4)) for s in range(3)]
+    assert settimane == sorted(settimane) and settimane[2] > 0.04, settimane
+    assert scarto(fine + timedelta(days=3), fine + timedelta(days=7)) < 0.015  # dopo la manutenzione
+
+
+def test_guasto_grave_essiccatoio():
+    giorno = SCENARI.giorno_guasto
+    assert giorno == date(2026, 9, 30)  # mercoledì della settimana dopo le mancanze
+    m3 = rilevazioni("M3", giorno, giorno)
+    guasto = [r for r in m3 if r["causale"] == "guasto" and datetime.fromisoformat(r["inizio"]).hour >= 8]
+    assert 4 * 60 <= len(guasto) <= 6 * 60 + 120  # 4-6 h, più un eventuale guasto casuale contiguo
+    # OEE di linea come nel back-end: confezioni buone in uscita al ritmo della più lenta (1,8 s) sul tempo pianificato.
+    m5 = rilevazioni("M5", giorno, giorno)
+    oee_linea = sum(r["pezzi"] - r["scarti"] for r in m5) * 1.8 / sum(r["durata_s"] for r in m3)
+    assert oee_linea < 0.65, oee_linea
+
+
+def test_mancanze_di_materiale_prima_causale_dell_impastatrice():
+    da, a = SCENARI.mancanze
+    assert (da, a) == (date(2026, 9, 21), date(2026, 9, 25))
+    # Qualunque sia il giorno di fine dello storico, i tre periodi restano separati e in giorni lavorativi.
+    for giorni in range(7):
+        s = Scenari(FINE.date() + timedelta(days=giorni), set())
+        assert s.degrado[1] < s.mancanze[0] and s.mancanze[1] < s.giorno_guasto and s.giorno_guasto.weekday() < 5
+    durata: dict[str, int] = {}
+    for r in rilevazioni("M1", da, a):
+        if r["causale"]:
+            durata[r["causale"]] = durata.get(r["causale"], 0) + r["t_fermo_s"]
+    assert max(durata, key=durata.get) == "mancanza_materiale", durata

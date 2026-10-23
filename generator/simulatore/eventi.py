@@ -27,11 +27,18 @@ DURATA_MINUTI = {
 MACCHINE_CON_SETUP = {"M2", "M4"}
 
 
-def fermo_casuale(rng: random.Random, prima_macchina: bool, passo_s: int) -> tuple[str, int] | None:
-    """Estrae l'eventuale fermo che inizia in questo passo; restituisce (causale, durata in secondi)."""
+def fermo_casuale(
+    rng: random.Random, prima_macchina: bool, passo_s: int, mancanze_extra: float = 0.0
+) -> tuple[str, int] | None:
+    """Estrae l'eventuale fermo che inizia in questo passo; restituisce (causale, durata in secondi).
+
+    `mancanze_extra` aumenta la probabilità al minuto delle mancanze di materiale (scenario delle mancanze ripetute).
+    """
     for causale, probabilita in PROBABILITA_AL_MINUTO.items():
-        if causale == "mancanza_materiale" and not prima_macchina:
-            continue
+        if causale == "mancanza_materiale":
+            if not prima_macchina:
+                continue
+            probabilita += mancanze_extra
         if rng.random() < probabilita * passo_s / 60:
             return causale, durata_casuale(rng, causale)
     return None

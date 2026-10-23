@@ -7,6 +7,9 @@ Modalità disponibili:
     auto      se il database è vuoto genera lo storico, altrimenti colma il buco tra l'ultima rilevazione e adesso;
               poi passa al live. È la modalità usata da Docker Compose: al primo avvio la dashboard ha subito dei dati
               e poi continua ad aggiornarsi. Con una data di fine fissata non passa al live (dati riproducibili).
+
+Gli scenari riconoscibili (degrado, mancanze di materiale, guasto grave) si applicano solo allo storico, perché sono
+posizionati rispetto alla sua data di fine; il recupero dei dati mancanti e il live simulano la linea senza scenari.
 """
 
 import logging
@@ -21,6 +24,7 @@ from config import Impostazioni
 from simulatore.calendario import APERTURA, CHIUSURA, FUSO, lavorativo
 from simulatore.flusso import Linea, simula_storico
 from simulatore.macchina import DatiMacchina
+from simulatore.scenari import Scenari, nomi_da_configurazione
 
 log = logging.getLogger("generatore")
 
@@ -41,12 +45,15 @@ def ripresa(ultime: list[dict]) -> datetime | None:
     return max(fini) if fini else None
 
 
-def genera(client: ClientApi, seme: int, da: date, fine: datetime, dopo: datetime | None = None) -> None:
+def genera(
+    client: ClientApi, seme: int, da: date, fine: datetime, dopo: datetime | None = None,
+    scenari: Scenari | None = None,
+) -> None:
     """Simula dal giorno `da` all'istante `fine` e invia un blocco per giorno; con `dopo` invia solo ciò che segue."""
     macchine = [DatiMacchina.da_api(m) for m in client.macchine()]
     avvio = time.perf_counter()
     totale = 0
-    for giorno, blocco in simula_storico(macchine, seme, da, fine):
+    for giorno, blocco in simula_storico(macchine, seme, da, fine, scenari=scenari):
         if dopo:
             blocco = [r for r in blocco if datetime.fromisoformat(r["inizio"]) >= dopo]
             if not blocco:
@@ -62,8 +69,14 @@ def genera(client: ClientApi, seme: int, da: date, fine: datetime, dopo: datetim
 def storico(client: ClientApi, impostazioni: Impostazioni) -> None:
     fine = istante_di_fine(impostazioni)
     inizio = fine.date() - timedelta(days=impostazioni.giorni - 1)
+    scenari = Scenari(fine.date(), nomi_da_configurazione(impostazioni.scenari))
     log.info("Storico dal %s al %s (seme %d)", inizio, fine, impostazioni.seme)
-    genera(client, impostazioni.seme, inizio, fine)
+    for nome in sorted(scenari.attivi):
+        if scenari.primo_giorno(nome) < inizio:
+            log.warning("Scenario %s fuori dallo storico (%s): servono più giorni", nome, scenari.descrizione(nome))
+        else:
+            log.info("Scenario %s: %s", nome, scenari.descrizione(nome))
+    genera(client, impostazioni.seme, inizio, fine, scenari=scenari)
 
 
 def in_turno(inizio: datetime, passo_s: int) -> bool:

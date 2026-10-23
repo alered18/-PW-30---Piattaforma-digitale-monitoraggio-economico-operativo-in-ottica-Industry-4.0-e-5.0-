@@ -51,6 +51,7 @@ services:
       GEN_INTERVALLO_LIVE_S: ${GEN_INTERVALLO_LIVE_S}
       GEN_SEME: ${GEN_SEME}
       GEN_DATA_FINE: ${GEN_DATA_FINE:-}
+      GEN_SCENARI: ${GEN_SCENARI:-}
       TZ: Europe/Rome
     depends_on:
       backend:
