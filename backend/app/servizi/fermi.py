@@ -88,3 +88,24 @@ def _durata(secondi: int) -> str:
     if ore:
         return f"{ore} h {minuti} min" if minuti else f"{ore} h"
     return f"{minuti} min" if not sec else f"{minuti} min {sec} s"
+
+
+def selezione_anomalie(da: date, a: date, macchina: str | None = None):
+    """Query delle anomalie dei giorni [da, a] con il codice della macchina (null per la linea)."""
+    filtro = (select(Anomalia, Macchina.codice).outerjoin(Macchina, Anomalia.macchina_id == Macchina.id)
+              .where(Anomalia.data >= da, Anomalia.data <= a))
+    return filtro.where(Macchina.codice == macchina) if macchina else filtro
+
+
+def anomalie(db: Session, da: date, a: date, tipo: str | None = None, macchina: str | None = None) -> list[dict]:
+    """Anomalie del periodo dalla più recente, come le restituisce l'API."""
+    filtro = selezione_anomalie(da, a, macchina)
+    if tipo:
+        filtro = filtro.where(Anomalia.tipo == tipo)
+    righe = db.execute(filtro.order_by(Anomalia.data.desc(), Anomalia.inizio.desc().nulls_last(), Anomalia.id))
+    return [
+        {"tipo": x.tipo, "data": x.data, "macchina": codice, "inizio": x.inizio, "fine": x.fine,
+         "causale": x.causale_codice, "kpi": x.kpi, "valore": None if x.valore is None else float(x.valore),
+         "soglia": None if x.soglia is None else float(x.soglia), "descrizione": x.descrizione}
+        for x, codice in righe
+    ]

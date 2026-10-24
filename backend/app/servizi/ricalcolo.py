@@ -54,10 +54,8 @@ def dati_macchina(m: Macchina) -> DatiMacchina:
                         float(m.costo_scarto_eur_conf))
 
 
-def _somme_del_giorno(db: Session, giorno: date) -> dict[int, dict]:
-    """Somme delle rilevazioni di un giorno per macchina, separando fermi pianificati e non pianificati."""
-    da = datetime.combine(giorno, time(), tzinfo=FUSO)
-    a = da + timedelta(days=1)
+def somme_rilevazioni(db: Session, da: datetime, a: datetime) -> dict[int, dict]:
+    """Somme per macchina delle rilevazioni iniziate in [da, a), separando fermi pianificati e non pianificati."""
     fermo_pianificato = case((CausaleFermo.pianificata, Rilevazione.t_fermo_s), else_=0)
     fermo_non_pianificato = case((CausaleFermo.pianificata, 0), else_=Rilevazione.t_fermo_s)
     righe = db.execute(
@@ -79,13 +77,27 @@ def _somme_del_giorno(db: Session, giorno: date) -> dict[int, dict]:
     return {r.macchina_id: r._asdict() for r in righe}
 
 
+def grandezze(somme: dict, t_disp_s: int) -> GrandezzeBase:
+    """Grandezze di base di una macchina dalle sue somme (vuote se non ha rilevazioni) e dal tempo disponibile."""
+    return GrandezzeBase(
+        t_disp_s=t_disp_s,
+        t_man_s=int(somme.get("t_man_s") or 0),
+        t_fermo_s=int(somme.get("t_fermo_s") or 0),
+        t_funz_s=int(somme.get("t_funz_s") or 0),
+        n_tot=int(somme.get("n_tot") or 0),
+        n_scarti=int(somme.get("n_scarti") or 0),
+        kwh=float(somme.get("kwh") or 0),
+    )
+
+
 def ricalcola_giorno(db: Session, giorno: date, adesso: datetime | None = None) -> bool:
     """Ricalcola un giorno. Restituisce False se quel giorno non ha rilevazioni (nulla da calcolare)."""
     adesso = adesso or datetime.now(FUSO)
     # Un ricalcolo alla volta per lo stesso giorno (generatore, lettura dei KPI, import): il lock del database
     # dura fino alla fine della transazione e fa attendere le altre richieste invece di farle collidere.
     db.execute(select(func.pg_advisory_xact_lock(giorno.toordinal())))
-    somme = _somme_del_giorno(db, giorno)
+    mezzanotte = datetime.combine(giorno, time(), tzinfo=FUSO)
+    somme = somme_rilevazioni(db, mezzanotte, mezzanotte + timedelta(days=1))
     if not somme:
         return False
 
@@ -106,15 +118,7 @@ def ricalcola_giorno(db: Session, giorno: date, adesso: datetime | None = None) 
     db.execute(delete(Anomalia).where(Anomalia.data == giorno, Anomalia.tipo == "dato"))
     for m, dati in zip(macchine, dati_macchine):
         s = somme.get(m.id, {})
-        base = GrandezzeBase(
-            t_disp_s=t_disp,
-            t_man_s=int(s.get("t_man_s") or 0),
-            t_fermo_s=int(s.get("t_fermo_s") or 0),
-            t_funz_s=int(s.get("t_funz_s") or 0),
-            n_tot=int(s.get("n_tot") or 0),
-            n_scarti=int(s.get("n_scarti") or 0),
-            kwh=float(s.get("kwh") or 0),
-        )
+        base = grandezze(s, t_disp)
         basi[m.codice] = base
         db.add(ProduzioneGiornaliera(
             data=giorno, macchina_id=m.id, t_disp_s=base.t_disp_s, t_man_s=base.t_man_s, t_fermo_s=base.t_fermo_s,

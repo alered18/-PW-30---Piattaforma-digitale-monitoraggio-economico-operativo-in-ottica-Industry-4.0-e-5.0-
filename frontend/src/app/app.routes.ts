@@ -12,5 +12,10 @@ export const routes: Routes = [
     title: 'Soglie — Monitoraggio produzione',
     loadComponent: () => import('./pagine/soglie/soglie').then((m) => m.Soglie),
   },
+  {
+    path: 'operatore',
+    title: 'Operatore — Monitoraggio produzione',
+    loadComponent: () => import('./pagine/operatore/operatore').then((m) => m.Operatore),
+  },
   { path: '**', redirectTo: 'cruscotto' },
 ];

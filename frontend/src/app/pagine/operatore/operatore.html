@@ -1,0 +1,59 @@
+<h1>Linea di produzione</h1>
+
+@if (risorsa.error()) {
+  <p class="messaggio errore">Impossibile leggere lo stato della linea: il back-end non risponde.</p>
+} @else if (stato(); as s) {
+  <p class="aggiornamento">Aggiornamento automatico ogni 10 secondi · ultimo alle {{ s.aggiornato_il | date: 'HH:mm:ss' }}</p>
+
+  @if (s.turno; as t) {
+    <mat-card appearance="outlined" class="turno">
+      <mat-card-content>
+        <h2>Turno {{ t.inizio | date: 'HH:mm' }} – {{ t.fine | date: 'HH:mm' }}</h2>
+        <div class="avanzamento">
+          <span class="numero">{{ formatta(t.n_buoni, 'intero') }}</span>
+          confezioni buone su un obiettivo di {{ formatta(t.obiettivo, 'intero') }}
+          ({{ formatta(t.avanzamento, 'percentuale') }})
+        </div>
+        <mat-progress-bar
+          mode="determinate"
+          [value]="(t.avanzamento ?? 0) * 100"
+          aria-label="Avanzamento rispetto all'obiettivo del turno"
+        />
+        <div class="scarto">
+          Scarto del turno: <b>{{ formatta(t.tasso_scarto, 'percentuale') }}</b>
+          ({{ formatta(t.n_scarti, 'intero') }} confezioni)
+        </div>
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <p class="messaggio">Nessun turno in corso: la linea lavora dal lunedì al venerdì, dalle 06:00 alle 22:00.</p>
+  }
+
+  <h2>Macchine</h2>
+  <div class="macchine">
+    @for (m of s.macchine; track m.codice) {
+      <mat-card appearance="outlined" class="macchina" [class]="m.stato">
+        <mat-card-content>
+          <div class="nome">{{ m.codice }} · {{ m.nome }}</div>
+          <div class="stato">
+            <mat-icon aria-hidden="true">{{ icona(m) }}</mat-icon>
+            {{ testo(m) }}
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+  </div>
+
+  <h2>Alert di oggi{{ s.alert.length ? ' (' + s.alert.length + ')' : '' }}</h2>
+  @if (s.alert.length) {
+    <ul class="alert">
+      @for (a of s.alert; track $index) {
+        <li><mat-icon aria-hidden="true">warning</mat-icon>{{ a.descrizione }}</li>
+      }
+    </ul>
+  } @else {
+    <p class="messaggio">Nessun superamento di soglia oggi.</p>
+  }
+} @else {
+  <mat-progress-bar mode="indeterminate" />
+}

@@ -1,0 +1,101 @@
+// Caratteri grandi: la vista è pensata per essere letta a distanza, da uno schermo a bordo linea.
+h1 {
+  font: var(--mat-sys-headline-medium);
+  margin: 0 0 4px;
+}
+
+h2 {
+  font: var(--mat-sys-title-large);
+  margin: 24px 0 8px;
+}
+
+.aggiornamento,
+.messaggio {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.errore {
+  color: var(--mat-sys-error);
+}
+
+.turno {
+  h2 {
+    margin-top: 0;
+  }
+
+  .avanzamento {
+    font: var(--mat-sys-title-medium);
+    margin-bottom: 12px;
+  }
+
+  .numero {
+    font: var(--mat-sys-display-small);
+    margin-right: 4px;
+  }
+
+  mat-progress-bar {
+    --mat-progress-bar-track-height: 12px;
+    --mat-progress-bar-active-indicator-height: 12px;
+  }
+
+  .scarto {
+    font: var(--mat-sys-title-medium);
+    margin-top: 12px;
+  }
+}
+
+.macchine {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.macchina {
+  .nome {
+    font: var(--mat-sys-title-medium);
+  }
+
+  .stato {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font: var(--mat-sys-title-large);
+  }
+
+  &.in_funzione .stato {
+    color: #146c2e;
+  }
+
+  &.ferma {
+    background: var(--mat-sys-error-container);
+    border-color: var(--mat-sys-error);
+
+    .nome,
+    .stato {
+      color: var(--mat-sys-on-error-container);
+    }
+  }
+
+  &.senza_dati .stato {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.alert {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font: var(--mat-sys-body-large);
+
+    mat-icon {
+      color: var(--mat-sys-error);
+    }
+  }
+}

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.sessione import sessione
 from app.db.tabelle import Anomalia, CausaleFermo, Macchina
 from app.schemi.fermi import AnomaliaOut, CausaleRipartita, FermoOut
+from app.servizi import fermi
 
 router = APIRouter(tags=["fermi e anomalie"])
 
@@ -17,13 +18,9 @@ router = APIRouter(tags=["fermi e anomalie"])
 def _filtri(db: Session, da: date, a: date, macchina: str | None):
     if da > a:
         raise HTTPException(status_code=422, detail="La data di inizio è successiva alla data di fine")
-    filtro = (select(Anomalia, Macchina.codice).outerjoin(Macchina, Anomalia.macchina_id == Macchina.id)
-              .where(Anomalia.data >= da, Anomalia.data <= a))
-    if macchina:
-        if db.scalar(select(Macchina.id).where(Macchina.codice == macchina)) is None:
-            raise HTTPException(status_code=422, detail=f"Macchina '{macchina}' non trovata")
-        filtro = filtro.where(Macchina.codice == macchina)
-    return filtro
+    if macchina and db.scalar(select(Macchina.id).where(Macchina.codice == macchina)) is None:
+        raise HTTPException(status_code=422, detail=f"Macchina '{macchina}' non trovata")
+    return fermi.selezione_anomalie(da, a, macchina)
 
 
 @router.get("/fermi", summary="Elenco dei fermi", response_model=list[FermoOut])
@@ -82,15 +79,5 @@ def elenco_anomalie(
 ):
     """Fermi, superamenti di soglia dei KPI e dati sospetti (tempo di turno senza rilevazioni, prestazioni oltre il
     100%), dal più recente."""
-    filtro = _filtri(db, da, a, macchina)
-    if tipo:
-        filtro = filtro.where(Anomalia.tipo == tipo)
-    righe = db.execute(filtro.order_by(Anomalia.data.desc(), Anomalia.inizio.desc().nulls_last(), Anomalia.id))
-    return [
-        AnomaliaOut(
-            tipo=x.tipo, data=x.data, macchina=codice, inizio=x.inizio, fine=x.fine, causale=x.causale_codice,
-            kpi=x.kpi, valore=None if x.valore is None else float(x.valore),
-            soglia=None if x.soglia is None else float(x.soglia), descrizione=x.descrizione,
-        )
-        for x, codice in righe
-    ]
+    _filtri(db, da, a, macchina)  # solo per controllare date e macchina
+    return fermi.anomalie(db, da, a, tipo, macchina)

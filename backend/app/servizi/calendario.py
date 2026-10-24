@@ -12,6 +12,7 @@ INIZIO_TURNI = time(6, 0)
 FINE_TURNI = time(22, 0)
 GIORNI_LAVORATIVI = range(0, 5)  # lunedì = 0 ... venerdì = 4
 SECONDI_GIORNATA = 16 * 3600
+DURATA_TURNO = timedelta(hours=8)
 
 
 def giorno_di(istante: datetime) -> date:
@@ -50,3 +51,16 @@ def secondi_disponibili(giorno: date, fino_a: datetime | None = None) -> int:
         return SECONDI_GIORNATA
     limite = min(max(fino_a.astimezone(FUSO), apertura(giorno)), chiusura(giorno))
     return int((limite - apertura(giorno)).total_seconds())
+
+
+def turno_di(istante: datetime) -> tuple[datetime, datetime] | None:
+    """Inizio e fine del turno che comprende l'istante; None fuori dall'orario di turno e nei giorni non lavorativi."""
+    giorno = giorno_di(istante)
+    if not lavorativo(giorno):
+        return None
+    inizio = apertura(giorno)
+    while inizio < chiusura(giorno):
+        if inizio <= istante < inizio + DURATA_TURNO:
+            return inizio, inizio + DURATA_TURNO
+        inizio += DURATA_TURNO
+    return None

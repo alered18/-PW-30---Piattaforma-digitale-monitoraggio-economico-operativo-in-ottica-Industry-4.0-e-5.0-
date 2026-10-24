@@ -122,6 +122,11 @@ def capacita_linea(macchine: Iterable[DatiMacchina]) -> float:
     return min(m.capacita_conf_h for m in macchine)
 
 
+def obiettivo_turno(capacita_linea_conf_h: float, ore_turno: float, quota: float) -> float:
+    """Confezioni buone attese in un turno: una quota della produzione massima della linea nelle ore del turno."""
+    return capacita_linea_conf_h * ore_turno * quota
+
+
 def produzione_kg(n_buoni: int, peso_conf_kg: float) -> float:
     """Produzione buona espressa in kg (le quantità si contano in confezioni)."""
     return n_buoni * peso_conf_kg
