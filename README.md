@@ -24,3 +24,26 @@ docker compose up --build
 - Documentazione API: http://localhost:8010/api/docs
 
 Per ripartire da un database vuoto: `docker compose down -v`.
+
+## Misure del sistema
+Il prototipo fornisce alcune misure reali su raccolta, elaborazione e memorizzazione dei dati.
+
+| Misura | Dove si legge |
+|---|---|
+| Spazio del database e di ogni tabella, righe, byte per riga | `GET /api/sistema/misure` → `database_byte`, `tabelle` |
+| Dimensione media di una rilevazione in JSON e su disco | `GET /api/sistema/misure` → `rilevazione` |
+| Rilevazioni per intervallo di campionamento (60 s storico, 5 s live) | `GET /api/sistema/misure` → `campionamento` |
+| Tempo di ricalcolo di un giorno (produzione, KPI, fermi, alert) | `GET /api/sistema/misure` → `ricalcolo_giorno_ms`; log `misure` del back-end |
+| Tempo di risposta e dimensione delle risposte delle API, KPI per granularità | `GET /api/sistema/misure` → `richieste_ms`; log `misure` del back-end |
+| Tempo di invio di un giorno di storico e di un invio live | `docker compose logs generator` |
+
+I tempi sono in millisecondi e riguardano le ultime 100 richieste di ogni tipo dall'avvio del back-end (si azzerano
+al riavvio). Esempio:
+
+```bash
+curl http://localhost:8010/api/sistema/misure
+docker compose logs backend | grep misure
+```
+
+Per confrontare il calcolo dei KPI per giorno, settimana e mese basta aprire il cruscotto e cambiare la granularità,
+oppure chiamare `GET /api/kpi` con lo stesso periodo e `granularita` diversa.

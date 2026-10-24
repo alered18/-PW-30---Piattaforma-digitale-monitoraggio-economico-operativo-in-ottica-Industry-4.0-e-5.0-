@@ -6,6 +6,7 @@ stessi dati dà sempre lo stesso risultato. Viene eseguito dopo ogni blocco di r
 ad esempio dopo una modifica dei parametri economici.
 """
 
+import time as orologio
 from dataclasses import asdict
 from datetime import date, datetime, time, timedelta
 
@@ -31,7 +32,7 @@ from app.kpi.formule import (
     kpi_linea,
     kpi_macchina,
 )
-from app.servizi import fermi, soglie
+from app.servizi import fermi, misure, soglie
 from app.servizi.calendario import FUSO, chiusura, giorno_di, secondi_disponibili
 
 # Sotto il minuto un buco tra le rilevazioni è solo un arrotondamento, non un dato mancante.
@@ -163,7 +164,12 @@ def _anomalie_di_dato(db: Session, giorno: date, m: Macchina, k: Kpi, scoperto_s
 
 def ricalcola(db: Session, giorni: list[date], adesso: datetime | None = None) -> list[date]:
     """Ricalcola più giorni in un'unica transazione; restituisce quelli che avevano dati."""
-    ricalcolati = [g for g in sorted(set(giorni)) if ricalcola_giorno(db, g, adesso)]
+    ricalcolati = []
+    for giorno in sorted(set(giorni)):
+        avvio = orologio.perf_counter()
+        if ricalcola_giorno(db, giorno, adesso):
+            ricalcolati.append(giorno)
+            misure.registra_ricalcolo(giorno, (orologio.perf_counter() - avvio) * 1000)
     db.commit()
     return ricalcolati
 

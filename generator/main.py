@@ -112,7 +112,7 @@ def live(
     linea = Linea(macchine, random.Random(impostazioni.seme + istante.toordinal()))
     log.info("Live dalle %s: una rilevazione per macchina ogni %d s", istante.astimezone(FUSO).time(), passo)
 
-    inviate, ultimo_log, era_in_turno = 0, time.monotonic(), False
+    inviate, ultimo_log, era_in_turno, tempi = 0, time.monotonic(), False, []
     while fino_a is None or istante + timedelta(seconds=passo) <= fino_a:
         attesa = (istante + timedelta(seconds=passo) - adesso()).total_seconds()
         if attesa > 0:
@@ -124,15 +124,20 @@ def live(
         era_in_turno = turno
         if turno:
             try:
-                client.invia(linea.passo(istante, passo))
+                blocco = linea.passo(istante, passo)
+                avvio = time.perf_counter()
+                client.invia(blocco)
+                tempi.append(time.perf_counter() - avvio)
                 inviate += len(macchine)
             except ErroreApi as errore:
                 # Un back-end momentaneamente fermo non interrompe il live: l'intervallo perso resta "non coperto".
                 log.warning("Intervallo delle %s non inviato: %s", istante.astimezone(FUSO).time(), errore)
         if time.monotonic() - ultimo_log >= 60:
             if inviate:
-                log.info("Live: %d rilevazioni inviate nell'ultimo minuto", inviate)
-            inviate, ultimo_log = 0, time.monotonic()
+                # Tempo di andata e ritorno di un invio: rete, validazione, memorizzazione e ricalcolo del giorno.
+                log.info("Live: %d rilevazioni inviate nell'ultimo minuto, %.0f ms in media per invio",
+                         inviate, 1000 * sum(tempi) / len(tempi))
+            inviate, ultimo_log, tempi = 0, time.monotonic(), []
         istante += timedelta(seconds=passo)
 
 
