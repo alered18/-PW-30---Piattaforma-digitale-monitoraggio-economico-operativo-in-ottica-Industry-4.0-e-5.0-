@@ -4,6 +4,7 @@ Il generatore conosce solo l'indirizzo delle API: nessuna credenziale del databa
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,7 +16,7 @@ class Impostazioni(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="GEN_", env_file=".env", extra="ignore", env_ignore_empty=True)
 
     api_url: str = "http://localhost:8010/api"
-    modalita: str = "auto"  # auto | storico | live | csv
+    modalita: Literal["auto", "storico", "live", "csv"] = "auto"
     giorni: int = 90
     # Deve dividere 60: così i passi cadono sugli orari di apertura, cambio turno e manutenzione.
     intervallo_live_s: int = Field(default=5, gt=0)
@@ -24,6 +25,8 @@ class Impostazioni(BaseSettings):
     data_fine: datetime | None = None
     # Scenari dello storico separati da virgole (degrado_trafila, mancanze_materiale, guasto_grave) oppure "nessuno".
     scenari: str = "degrado_trafila,mancanze_materiale,guasto_grave"
+    # File scritto dalla modalità csv; il percorso predefinito vale avviando il generatore dalla sua cartella.
+    file_csv: str = "../database/esempi/rilevazioni_esempio.csv"
 
     @field_validator("intervallo_live_s")
     @classmethod

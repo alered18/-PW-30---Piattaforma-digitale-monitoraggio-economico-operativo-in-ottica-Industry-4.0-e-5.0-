@@ -39,6 +39,21 @@ class EsitoIngestione(BaseModel):
     giorni_toccati: list[date]
 
 
+class RigaCsvScartata(BaseModel):
+    riga: int = Field(description="Numero di riga nel file; l'intestazione è la riga 1")
+    macchina: str | None
+    inizio: str | None = Field(description="Come scritto nel file")
+    motivi: list[str]
+
+
+class EsitoImport(BaseModel):
+    righe: int = Field(description="Righe di dati lette dal file, intestazione esclusa")
+    memorizzate: int
+    duplicate: int = Field(description="Rilevazioni già presenti (stessa macchina e stesso inizio), ignorate")
+    scartate: list[RigaCsvScartata]
+    giorni_toccati: list[date]
+
+
 class RilevazioneOut(BaseModel):
     macchina: str
     inizio: datetime

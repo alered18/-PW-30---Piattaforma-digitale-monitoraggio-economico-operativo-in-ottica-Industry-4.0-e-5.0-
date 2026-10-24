@@ -1,0 +1,70 @@
+<h1>Importa rilevazioni da CSV</h1>
+<p class="spiegazione">
+  Il file è un testo UTF-8 con i valori separati da virgole e i decimali con il punto. La prima riga è l'intestazione
+  con le colonne <code>{{ colonneCsv }}</code>; <code>causale</code> e <code>tempo_ciclo_medio_s</code> possono restare
+  vuote. Le righe valide vengono memorizzate e i KPI dei giorni toccati ricalcolati; le righe non valide sono elencate
+  con il motivo. Le rilevazioni già presenti vengono ignorate.
+</p>
+
+<mat-card appearance="outlined">
+  <mat-card-content class="scelta">
+    <input #selettore type="file" accept=".csv,text/csv" hidden (change)="scegli($event)" />
+    <button mat-stroked-button type="button" (click)="selettore.click()">
+      <mat-icon>upload_file</mat-icon>
+      Scegli file
+    </button>
+    <span class="nome-file">{{ file()?.name ?? 'Nessun file selezionato' }}</span>
+  </mat-card-content>
+  <mat-card-actions align="end">
+    <button mat-flat-button type="button" (click)="importa()" [disabled]="!file() || invio()">Importa</button>
+  </mat-card-actions>
+  @if (invio()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+</mat-card>
+
+@if (errore(); as e) {
+  <p class="errore">{{ e }}</p>
+}
+
+@if (esito(); as e) {
+  <h2>Esito</h2>
+  <ul class="riepilogo">
+    <li>Righe lette: <b>{{ e.righe }}</b></li>
+    <li>Memorizzate: <b>{{ e.memorizzate }}</b></li>
+    <li>Già presenti, ignorate: <b>{{ e.duplicate }}</b></li>
+    <li [class.errore]="e.scartate.length">Scartate: <b>{{ e.scartate.length }}</b></li>
+  </ul>
+  @if (e.giorni_toccati.length) {
+    <p>
+      Giorni aggiornati:
+      @for (g of e.giorni_toccati; track g; let ultimo = $last) {
+        {{ dataBreve(g) }}{{ ultimo ? '' : ', ' }}
+      }
+    </p>
+  }
+
+  @if (e.scartate.length) {
+    <h2>Righe scartate</h2>
+    <table mat-table [dataSource]="e.scartate" class="scartate">
+      <ng-container matColumnDef="riga">
+        <th mat-header-cell *matHeaderCellDef>Riga</th>
+        <td mat-cell *matCellDef="let s">{{ s.riga }}</td>
+      </ng-container>
+      <ng-container matColumnDef="macchina">
+        <th mat-header-cell *matHeaderCellDef>Macchina</th>
+        <td mat-cell *matCellDef="let s">{{ s.macchina }}</td>
+      </ng-container>
+      <ng-container matColumnDef="inizio">
+        <th mat-header-cell *matHeaderCellDef>Inizio</th>
+        <td mat-cell *matCellDef="let s">{{ s.inizio }}</td>
+      </ng-container>
+      <ng-container matColumnDef="motivi">
+        <th mat-header-cell *matHeaderCellDef>Motivo</th>
+        <td mat-cell *matCellDef="let s">{{ s.motivi.join('; ') }}</td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="colonne"></tr>
+      <tr mat-row *matRowDef="let riga; columns: colonne"></tr>
+    </table>
+  }
+}

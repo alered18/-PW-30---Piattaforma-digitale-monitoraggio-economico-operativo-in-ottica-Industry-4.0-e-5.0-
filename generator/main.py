@@ -6,7 +6,8 @@ Modalità disponibili:
               fermato;
     auto      se il database è vuoto genera lo storico, altrimenti colma il buco tra l'ultima rilevazione e adesso;
               poi passa al live. È la modalità usata da Docker Compose: al primo avvio la dashboard ha subito dei dati
-              e poi continua ad aggiornarsi. Con una data di fine fissata non passa al live (dati riproducibili).
+              e poi continua ad aggiornarsi. Con una data di fine fissata non passa al live (dati riproducibili);
+    csv       scrive un file CSV di esempio nel formato di import, con 100 righe valide e 3 non valide.
 
 Gli scenari riconoscibili (degrado, mancanze di materiale, guasto grave) si applicano solo allo storico, perché sono
 posizionati rispetto alla sua data di fine; il recupero dei dati mancanti e il live simulano la linea senza scenari.
@@ -18,9 +19,11 @@ import sys
 import time
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from client_api import ClientApi, ErroreApi
 from config import Impostazioni
+from simulatore import esempio_csv
 from simulatore.calendario import APERTURA, CHIUSURA, FUSO, lavorativo
 from simulatore.flusso import Linea, simula_storico
 from simulatore.macchina import DatiMacchina
@@ -154,6 +157,14 @@ def auto(client: ClientApi, impostazioni: Impostazioni) -> None:
     live(client, impostazioni, da=ripresa(client.ultime()))
 
 
+def scrivi_csv(client: ClientApi, impostazioni: Impostazioni) -> None:
+    macchine = [DatiMacchina.da_api(m) for m in client.macchine()]
+    righe = esempio_csv.righe_esempio(macchine, impostazioni.seme)
+    percorso = Path(impostazioni.file_csv)
+    esempio_csv.scrivi(percorso, righe)
+    log.info("Scritte %d righe in %s", len(righe), percorso.resolve())
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -163,12 +174,9 @@ def main() -> int:
     if not client.attendi():
         log.error("Back-end non raggiungibile su %s", impostazioni.api_url)
         return 1
-    modalita = {"storico": storico, "live": live, "auto": auto}
+    modalita = {"storico": storico, "live": live, "auto": auto, "csv": scrivi_csv}
     try:
-        if impostazioni.modalita in modalita:
-            modalita[impostazioni.modalita](client, impostazioni)
-        else:
-            log.warning("Modalità '%s' non ancora disponibile: nessun dato generato.", impostazioni.modalita)
+        modalita[impostazioni.modalita](client, impostazioni)
     except ErroreApi as errore:
         log.error("%s", errore)
         return 1

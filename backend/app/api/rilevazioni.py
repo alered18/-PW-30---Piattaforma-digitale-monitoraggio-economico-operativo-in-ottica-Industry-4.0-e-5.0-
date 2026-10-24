@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -10,13 +10,14 @@ from sqlalchemy.orm import Session
 from app.db.sessione import sessione
 from app.db.tabelle import Macchina, Rilevazione
 from app.schemi.rilevazioni import (
+    EsitoImport,
     EsitoIngestione,
     PaginaRilevazioni,
     RilevazioneIn,
     RilevazioneOut,
     UltimaRilevazione,
 )
-from app.servizi import ingestione, ricalcolo
+from app.servizi import importazione, ingestione, ricalcolo
 from app.servizi.calendario import FUSO
 
 router = APIRouter(prefix="/rilevazioni", tags=["rilevazioni"])
@@ -54,6 +55,22 @@ def ricevi(rilevazioni: list[RilevazioneIn], db: Session = Depends(sessione)):
         scartate=[],
         giorni_toccati=giorni,
     )
+
+
+@router.post("/import", summary="Importa rilevazioni da un file CSV", response_model=EsitoImport)
+def importa(
+    file: UploadFile = File(description="CSV in UTF-8 separato da virgole, con intestazione: " +
+                            ",".join(importazione.COLONNE)),
+    db: Session = Depends(sessione),
+):
+    """Memorizza le righe valide e restituisce quelle scartate con il numero di riga e i motivi; i controlli sono
+    gli stessi dei blocchi del generatore, comprese le sovrapposizioni. Le righe già presenti (stessa macchina e
+    stesso inizio) sono contate tra le duplicate, quindi importare due volte lo stesso file non duplica i dati.
+    Un file illeggibile o con un'intestazione diversa da quella attesa è rifiutato per intero."""
+    try:
+        return importazione.importa(db, file.file.read())
+    except importazione.FileNonValido as errore:
+        raise HTTPException(status_code=422, detail=str(errore)) from None
 
 
 def _uscita(r: Rilevazione, codice: str) -> RilevazioneOut:

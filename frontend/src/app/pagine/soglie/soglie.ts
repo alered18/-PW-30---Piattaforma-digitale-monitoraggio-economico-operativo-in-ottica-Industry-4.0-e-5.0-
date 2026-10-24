@@ -9,6 +9,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { Soglia, ValoriKpi } from '../../modelli/kpi';
+import { messaggio } from '../../servizi/errori';
 import { KpiService } from '../../servizi/kpi.service';
 
 /**
@@ -129,12 +130,4 @@ export class Soglie {
 /** Rifiuta i valori con più decimali di quanti il database ne conserva, invece di arrotondarli in silenzio. */
 function alPiuDecimali(n: number): ValidatorFn {
   return (c) => (c.value === null || Number(c.value.toFixed(n)) === c.value ? null : { decimali: n });
-}
-
-/** Messaggio leggibile da un errore dell'API: il dettaglio del back-end se c'è, altrimenti lo stato HTTP. */
-function messaggio(e: HttpErrorResponse): string {
-  const dettaglio = e.error?.detail;
-  if (typeof dettaglio === 'string') return dettaglio;
-  if (Array.isArray(dettaglio) && dettaglio[0]?.msg) return dettaglio[0].msg;
-  return e.status === 0 ? 'il back-end non risponde' : `errore ${e.status}`;
 }
