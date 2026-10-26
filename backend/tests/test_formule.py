@@ -48,22 +48,18 @@ def test_settimana_e_rapporto_delle_somme_non_media_dei_giorni():
     assert kpi_di("M2", somma([lunedi, martedi])).tasso_scarto == pytest.approx(0.02)
 
 
-def test_giorno_senza_turni_e_macchina_sempre_ferma():
+def test_casi_limite():
+    # Giorno senza turni: i KPI sono "n.d.", non 0.
     vuoto = kpi_di("M1", GrandezzeBase())
-    assert vuoto.oee is None and vuoto.kwh_conf is None and vuoto.saturazione is None  # "n.d.", non 0
+    assert vuoto.oee is None and vuoto.kwh_conf is None and vuoto.saturazione is None
     # Guasto per l'intera giornata: la macchina doveva lavorare, quindi OEE 0; il consumo a fermo resta.
     ferma = kpi_di("M3", GrandezzeBase(GIORNATA, 0, GIORNATA, 0, 0, 0, 1680.0))
     assert ferma.oee == 0 and ferma.qualita is None and ferma.kwh_conf is None
-
-
-def test_prestazioni_oltre_il_cento_per_cento():
-    # Macchina: 30.000 confezioni in 14 h a 2.000 conf/h è impossibile, quindi è un dato da segnalare.
+    # Prestazioni oltre il 100%: 30.000 confezioni in 14 h a 2.000 conf/h è impossibile, quindi è un dato da segnalare.
     k = kpi_di("M3", GrandezzeBase(GIORNATA, 0, 2 * ORA, 14 * ORA, 30000, 0, 0.0))
     assert k.prestazioni == 1.0 and k.prestazioni_limitate
-    # Linea: M3 gira sempre e le macchine più veloci recuperano i fermi; OEE 100% e nessuna anomalia.
-    def macchina(fermo_h):
-        return GrandezzeBase(GIORNATA, 0, round(fermo_h * ORA), GIORNATA - round(fermo_h * ORA), 32000, 0, 0.0)
-
-    linea = kpi_linea({"M1": macchina(2.6), "M2": macchina(1.4), "M3": macchina(0), "M4": macchina(1.4),
-                       "M5": macchina(3.6)}, MACCHINE, PARAMETRI)
+    # Sulla linea invece no: M3 gira sempre e le macchine più veloci recuperano i fermi; OEE 100% e nessuna anomalia.
+    fermo_h = {"M1": 2.6, "M2": 1.4, "M3": 0, "M4": 1.4, "M5": 3.6}
+    linea = kpi_linea({c: GrandezzeBase(GIORNATA, 0, round(h * ORA), GIORNATA - round(h * ORA), 32000, 0, 0.0)
+                       for c, h in fermo_h.items()}, MACCHINE, PARAMETRI)
     assert linea.oee == pytest.approx(1.0) and linea.prestazioni == 1.0 and not linea.prestazioni_limitate

@@ -6,7 +6,6 @@ import pytest
 
 from app.api.operatore import ora_attuale
 from app.main import app
-from app.servizi.calendario import FUSO
 
 GIORNO = "2026-10-12"  # lunedì
 

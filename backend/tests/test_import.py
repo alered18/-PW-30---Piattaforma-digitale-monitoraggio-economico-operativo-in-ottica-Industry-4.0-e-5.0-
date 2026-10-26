@@ -28,8 +28,7 @@ def test_import_del_file_di_esempio(client):
     di_nuovo = importa(client, ESEMPIO.read_bytes()).json()
     assert (di_nuovo["memorizzate"], di_nuovo["duplicate"], len(di_nuovo["scartate"])) == (0, 100, 3)
 
-
-def test_intestazione_errata_rifiuta_il_file(client):
+    # Un file con il separatore o le colonne sbagliate è rifiutato per intero, con il motivo.
     risposta = importa(client, b"macchina;inizio;pezzi\nM1;2026-01-12T06:00:00+01:00;30\n")
     assert risposta.status_code == 422
     assert risposta.json()["detail"] == "I valori devono essere separati da virgole, non da punti e virgola"

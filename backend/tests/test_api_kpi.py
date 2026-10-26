@@ -36,8 +36,7 @@ def test_giorno_settimana_mese_e_totale(client):
     assert [p["periodo"] for p in risposta["serie"]] == ["2026-10"]
     assert risposta["totale"]["kpi"]["costo_fermi_eur"] == pytest.approx(2 * 1690.0)
 
-
-def test_parametri_non_validi(client):
+    # Periodo al contrario o macchina inesistente: errore con il motivo.
     assert client.get("/api/kpi", params={"da": "2026-10-31", "a": "2026-10-01"}).status_code == 422
     errore = client.get("/api/kpi", params={"da": "2026-10-01", "a": "2026-10-31", "ambito": "M9"})
     assert errore.status_code == 422 and "M9" in errore.json()["detail"]

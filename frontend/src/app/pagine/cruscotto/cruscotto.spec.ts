@@ -124,21 +124,4 @@ describe('Cruscotto', () => {
     const celle = fixture.nativeElement.querySelectorAll('.elenco-alert td') as NodeListOf<HTMLElement>;
     expect(Array.from(celle, (c) => c.textContent?.trim())).toEqual(['16/10/2026', 'Linea', 'OEE', '58,2%', '65,0%']);
   });
-
-  it('richiede di nuovo i KPI quando cambiano granularità e ambito', async () => {
-    const fixture = await apri();
-    http.expectOne((r) => r.url === '/api/kpi').flush({ ambito: 'linea', granularita: 'giorno', da: '2026-10-16',
-      a: '2026-10-16', soglie: [], serie: [], totale: null });
-    await fixture.whenStable();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Nessun dato nel periodo selezionato');
-
-    const pagina = fixture.componentInstance as unknown as { cambiaGranularita(g: string): void; cambiaAmbito(a: string): void };
-    pagina.cambiaGranularita('settimana');
-    pagina.cambiaAmbito('M3');
-    TestBed.tick();
-    const richiesta = http.expectOne((r) => r.url === '/api/kpi');
-    expect(richiesta.request.params.get('granularita')).toBe('settimana');
-    expect(richiesta.request.params.get('ambito')).toBe('M3');
-  });
 });

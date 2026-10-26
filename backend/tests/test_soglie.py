@@ -8,15 +8,13 @@ from test_ricalcolo import rilevazioni_del_lunedi
 GIORNO = {"da": "2026-10-12", "a": "2026-10-12"}
 
 
-@pytest.mark.parametrize("valore, regola, atteso", [
-    (0.60, RegolaSoglia("oee", "min", 0.65), "fuori_soglia"),
-    (0.65, RegolaSoglia("oee", "min", 0.65), "ok"),  # uguale alla soglia: non è un superamento
-    (0.649996, RegolaSoglia("oee", "min", 0.65), "ok"),  # confrontato come memorizzato: 0,65000
-    (0.06, RegolaSoglia("tasso_scarto", "max", 0.05), "fuori_soglia"),
-    (None, RegolaSoglia("oee", "min", 0.65), "nd"),  # KPI non calcolabile: mai fuori soglia
-])
-def test_valuta(valore, regola, atteso):
-    assert valuta(valore, regola) == atteso
+def test_confronto_con_le_soglie():
+    oee_minimo = RegolaSoglia("oee", "min", 0.65)
+    assert valuta(0.60, oee_minimo) == "fuori_soglia"
+    assert valuta(0.65, oee_minimo) == "ok"  # uguale alla soglia: non è un superamento
+    assert valuta(0.649996, oee_minimo) == "ok"  # confrontato come memorizzato: 0,65000
+    assert valuta(None, oee_minimo) == "nd"  # KPI non calcolabile: mai fuori soglia
+    assert valuta(0.06, RegolaSoglia("tasso_scarto", "max", 0.05)) == "fuori_soglia"
 
 
 def test_modifica_della_soglia_di_scarto_e_alert(client):

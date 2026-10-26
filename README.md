@@ -25,6 +25,31 @@ docker compose up --build
 
 Per ripartire da un database vuoto: `docker compose down -v`.
 
+## Test
+Tutti i test automatici (back-end, generatore, front-end) si lanciano con un solo comando dalla radice del
+repository, da Git Bash su Windows o da un terminale Linux/macOS:
+
+```bash
+./test.sh
+```
+
+Lo script avvia il servizio `db` se non è attivo (i test del back-end usano il database separato `pw30_test`,
+indicato da `DATABASE_URL_TEST` in `.env`), esegue le tre serie e stampa il riepilogo; termina con errore se una
+serie fallisce. Richiede gli ambienti di sviluppo locali:
+
+```bash
+# su Linux e macOS il Python dell'ambiente è .venv/bin/python
+(cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]")
+(cd generator && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]")
+(cd frontend && npm ci)
+```
+
+| Serie | Cosa verifica | Comando singolo |
+|---|---|---|
+| Back-end | formule dei KPI e casi limite, calendario, soglie; API su database: ricezione e validazione, ricalcolo, KPI per periodo, fermi, alert, import CSV, vista operatore | `cd backend && .venv/Scripts/python -m pytest -q` |
+| Generatore | dati riproducibili e coerenti, valori plausibili su 90 giorni, scenari, modalità live | `cd generator && .venv/Scripts/python -m pytest -q` |
+| Front-end | cruscotto (formati, "n.d.", soglie e alert) e vista operatore | `cd frontend && npx ng test --watch=false` |
+
 ## Misure del sistema
 Il prototipo fornisce alcune misure reali su raccolta, elaborazione e memorizzazione dei dati.
 

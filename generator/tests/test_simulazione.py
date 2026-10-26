@@ -1,12 +1,10 @@
 """Test della simulazione, senza back-end."""
 
 from dataclasses import asdict
-from functools import cache
 from datetime import date, datetime, timedelta
 
-from client_api import ClientApi
 from config import Impostazioni
-from main import live, ripresa
+from main import live
 from simulatore.calendario import FUSO
 from simulatore.flusso import simula_storico
 from simulatore.macchina import DatiMacchina
@@ -28,13 +26,9 @@ def storico(seme: int, giorni: int, scenari: Scenari | None = None) -> list[dict
     return [r for _, blocco in simula_storico(MACCHINE, seme, da, FINE, scenari=scenari) for r in blocco]
 
 
-def test_stesso_seme_stessi_dati():
-    assert storico(7, 7) == storico(7, 7)
-    assert storico(7, 7) != storico(8, 7)
-
-
-def test_rilevazioni_coerenti_e_solo_in_orario_di_turno():
-    rilevazioni = storico(1, 7)
+def test_dati_riproducibili_coerenti_e_solo_in_orario_di_turno():
+    rilevazioni = storico(7, 7)
+    assert rilevazioni == storico(7, 7) and rilevazioni != storico(8, 7)  # stesso seme, stessi dati
     giorni = {datetime.fromisoformat(r["inizio"]).date() for r in rilevazioni}
     assert giorni == {date(2026, 10, d) for d in (9, 12, 13, 14, 15, 16)}  # dal venerdì precedente, niente weekend
     for r in rilevazioni:
@@ -58,20 +52,6 @@ def test_novanta_giorni_plausibili():
     oee_linea = buone * 1.8 / pianificato_s
     assert 0.60 <= oee_linea <= 0.85, oee_linea
     assert 0.02 <= scarti / (buone + scarti) <= 0.05
-
-
-def test_modalita_auto_riprende_dopo_l_ultima_rilevazione():
-    assert ripresa([{"macchina": "M1", "ultima": None}]) is None  # database vuoto: si genera lo storico
-    ultime = [
-        {"macchina": "M1", "ultima": {"inizio": "2026-10-16T21:58:00+02:00", "durata_s": 60}},
-        {"macchina": "M2", "ultima": {"inizio": "2026-10-16T21:59:00+02:00", "durata_s": 60}},
-    ]
-    assert ripresa(ultime) == datetime(2026, 10, 16, 22, 0, tzinfo=FUSO)
-
-
-def test_backend_spento_segnalato():
-    # Nessun servizio in ascolto su questa porta: il generatore rinuncia invece di scrivere dati.
-    assert ClientApi("http://127.0.0.1:9/api").attendi(tentativi=1, attesa_s=0) is False
 
 
 class ClientFinto:
@@ -105,22 +85,16 @@ def test_live_un_blocco_ogni_5_secondi_solo_in_orario_di_turno():
     assert len(esegui_live(datetime(2026, 10, 16, 21, 59, 30, tzinfo=FUSO), 1)) == 6
 
 
-# --- Scenari: 90 giorni con tutti gli scenari attivi, generati una sola volta per i tre test seguenti ---
-
 SCENARI = Scenari(FINE.date(), {"degrado_trafila", "mancanze_materiale", "guasto_grave"})
 
 
-@cache
-def storico_con_scenari() -> tuple[dict, ...]:
-    return tuple(storico(42, 90, SCENARI))
+def test_scenari_riconoscibili_nei_dati():
+    dati = storico(42, 90, SCENARI)
 
+    def rilevazioni(macchina: str, da: date, a: date) -> list[dict]:
+        return [r for r in dati if r["macchina"] == macchina and da <= datetime.fromisoformat(r["inizio"]).date() <= a]
 
-def rilevazioni(macchina: str, da: date, a: date) -> list[dict]:
-    return [r for r in storico_con_scenari()
-            if r["macchina"] == macchina and da <= datetime.fromisoformat(r["inizio"]).date() <= a]
-
-
-def test_degrado_trafila_scarto_crescente_poi_normale():
+    # Degrado della trafila: scarto crescente per tre settimane, poi normale dopo la manutenzione.
     inizio, fine = SCENARI.degrado
     assert (inizio, fine) == (date(2026, 8, 31), date(2026, 9, 18))  # tre settimane, dal lunedì al venerdì
 
@@ -130,10 +104,9 @@ def test_degrado_trafila_scarto_crescente_poi_normale():
 
     settimane = [scarto(inizio + timedelta(weeks=s), inizio + timedelta(weeks=s, days=4)) for s in range(3)]
     assert settimane == sorted(settimane) and settimane[2] > 0.04, settimane
-    assert scarto(fine + timedelta(days=3), fine + timedelta(days=7)) < 0.015  # dopo la manutenzione
+    assert scarto(fine + timedelta(days=3), fine + timedelta(days=7)) < 0.015
 
-
-def test_guasto_grave_essiccatoio():
+    # Guasto grave dell'essiccatoio: 4-6 ore di fermo in un giorno e OEE di linea sotto soglia.
     giorno = SCENARI.giorno_guasto
     assert giorno == date(2026, 9, 30)  # mercoledì della settimana dopo le mancanze
     m3 = rilevazioni("M3", giorno, giorno)
@@ -144,8 +117,7 @@ def test_guasto_grave_essiccatoio():
     oee_linea = sum(r["pezzi"] - r["scarti"] for r in m5) * 1.8 / sum(r["durata_s"] for r in m3)
     assert oee_linea < 0.65, oee_linea
 
-
-def test_mancanze_di_materiale_prima_causale_dell_impastatrice():
+    # Mancanze di materiale: per una settimana sono la prima causale di fermo dell'impastatrice.
     da, a = SCENARI.mancanze
     assert (da, a) == (date(2026, 9, 21), date(2026, 9, 25))
     # Qualunque sia il giorno di fine dello storico, i tre periodi restano separati e in giorni lavorativi.

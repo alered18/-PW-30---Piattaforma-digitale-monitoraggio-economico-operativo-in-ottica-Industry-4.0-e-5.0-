@@ -47,7 +47,7 @@ def indicatori(db):
     return {r[0]: [float(v) if not isinstance(v, bool) else v for v in r[1:]] for r in righe}
 
 
-def test_rilevazioni_diventano_indicatori_e_il_ricalcolo_e_ripetibile(client, db):
+def test_rilevazioni_diventano_indicatori_e_ricalcolo(client, db):
     esito = client.post("/api/rilevazioni", json=rilevazioni_del_lunedi())
     assert esito.status_code == 200, esito.json()
 
@@ -64,12 +64,9 @@ def test_rilevazioni_diventano_indicatori_e_il_ricalcolo_e_ripetibile(client, db
     assert client.post("/api/kpi/ricalcola", params={"da": "2026-10-12", "a": "2026-10-12"}).status_code == 200
     assert indicatori(db) == valori
 
-
-def test_cambio_del_prezzo_energia_e_ricalcolo(client, db):
-    client.post("/api/rilevazioni", json=rilevazioni_del_lunedi())
-    assert indicatori(db)["linea"][3] == pytest.approx(941.45)  # 4.707,25 kWh × 0,20 €
-
-    client.put("/api/parametri/prezzo_energia", json={"valore": 0.40})
+    # Con un nuovo prezzo dell'energia il ricalcolo aggiorna il costo energetico del giorno.
+    assert valori["linea"][3] == pytest.approx(941.45)  # 4.707,25 kWh × 0,20 €
+    assert client.put("/api/parametri/prezzo_energia", json={"valore": 0.40}).status_code == 200
     esito = client.post("/api/kpi/ricalcola", params={"da": "2026-10-01", "a": "2026-10-31"}).json()
     assert esito == {"giorni_ricalcolati": ["2026-10-12"]}
     assert indicatori(db)["linea"][3] == pytest.approx(1882.90)
