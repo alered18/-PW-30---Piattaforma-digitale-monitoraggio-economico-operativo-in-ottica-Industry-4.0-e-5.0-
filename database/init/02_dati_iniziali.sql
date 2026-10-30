@@ -37,7 +37,7 @@ INSERT INTO parametro (chiave, valore, unita, descrizione) VALUES
     -- Il valore della produzione persa in un'ora di fermo non è memorizzato: si ricava come capacità della linea
     -- (macchina più lenta) × margine, così resta coerente se uno dei due cambia (2.000 conf/h × 0,40 € = 800 €/h).
     ('margine_conf',            0.40,  '€/conf',    'Margine di contribuzione per confezione'),
-    ('fattore_co2',             0.27,  'kgCO₂/kWh', 'Emissioni medie del mix elettrico nazionale'),
+    ('fattore_co2',             0.20,  'kgCO₂/kWh', 'Emissioni medie dei consumi elettrici nazionali'),
     ('peso_conf',               0.5,   'kg',        'Peso di una confezione'),
     ('quota_obiettivo_turno',   0.75,  'frazione',  'Obiettivo di turno come quota della capacità di linea in 8 ore');
 

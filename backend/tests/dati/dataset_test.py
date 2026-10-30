@@ -42,7 +42,7 @@ PARAMETRI = ParametriEconomici(
     costo_materia_conf=0.25,
     costo_imballo_conf=0.04,
     margine_conf=0.40,
-    fattore_co2=0.27,
+    fattore_co2=0.20,
 )
 
 # Capacità della linea = macchina più lenta (M3) = 2.000 conf/h.
@@ -77,8 +77,8 @@ ATTESI_M3 = {
     "kwh": 2310.0,
     "kwh_conf": 2310 / 24800,  # 0,0931 kWh per confezione buona
     "costo_fermi_eur": 1690.0,  # 2 h × (45 €/h + 800 €/h)
-    "co2_kg": 623.7,  # 2.310 × 0,27
-    "co2_kg_conf": 623.7 / 24800,  # 0,0251 kg per confezione buona
+    "co2_kg": 462.0,  # 2.310 × 0,20
+    "co2_kg_conf": 462 / 24800,  # 0,0186 kg per confezione buona
     "saturazione": 0.875,  # 14 h / 16 h disponibili
     "costo_macchina_eur": 720.0,  # 16 h × 45 €/h
     "costo_energia_eur": 462.0,  # 2.310 × 0,20
@@ -109,8 +109,8 @@ ATTESI_LINEA = {
     # Fermi: ore × costo orario; per l'essiccatoio (collo di bottiglia) si aggiungono 800 €/h di produzione persa.
     #   M1 1 × 25 + M2 1,5 × 40 + M3 2 × (45 + 800) + M4 1 × 35 + M5 0,5 × 20 = 25 + 60 + 1.690 + 35 + 10
     "costo_fermi_eur": 1820.0,
-    "co2_kg": 4707.25 * 0.27,  # 1.270,96 kg
-    "co2_kg_conf": 4707.25 * 0.27 / 24500,  # 0,0519 kg per confezione
+    "co2_kg": 4707.25 * 0.20,  # 941,45 kg
+    "co2_kg_conf": 4707.25 * 0.20 / 24500,  # 0,0384 kg per confezione
     "saturazione": 74 / 80,  # nessuna manutenzione: tempo disponibile = tempo pianificato
     "costo_macchina_eur": 2640.0,  # 16 h × 165 €/h (somma dei costi orari)
     "costo_energia_eur": 941.45,  # 4.707,25 × 0,20
